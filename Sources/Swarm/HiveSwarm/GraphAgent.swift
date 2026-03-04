@@ -32,7 +32,7 @@ import Swarm
 /// let result = try await hiveAgent.run("Summarize the latest findings.")
 /// print(result.output)
 /// ```
-public struct GraphAgent: AgentRuntime, Sendable {
+struct GraphAgent: AgentRuntime, Sendable {
     // MARK: - Properties
 
     /// The wrapped Hive agents runtime.
@@ -49,9 +49,9 @@ public struct GraphAgent: AgentRuntime, Sendable {
 
     // MARK: - AgentRuntime Properties
 
-    nonisolated public let tools: [any AnyJSONTool]
-    nonisolated public let instructions: String
-    nonisolated public let configuration: AgentConfiguration
+    nonisolated let tools: [any AnyJSONTool]
+    nonisolated let instructions: String
+    nonisolated let configuration: AgentConfiguration
 
     // MARK: - Initialization
 
@@ -66,7 +66,7 @@ public struct GraphAgent: AgentRuntime, Sendable {
     ///   - runOptions: Hive run options. Default: 20 max steps, checkpointing disabled.
     ///   - configuration: Swarm agent configuration. If not provided, a default
     ///     is created using the given name.
-    public init(
+    init(
         runtime: GraphRuntimeAdapter,
         name: String,
         instructions: String = "",
@@ -99,7 +99,7 @@ public struct GraphAgent: AgentRuntime, Sendable {
     ///   - observer: Optional observer for lifecycle callbacks.
     /// - Returns: The translated `AgentResult`.
     /// - Throws: `AgentError` wrapping any `HiveRuntimeError`.
-    public func run(
+    func run(
         _ input: String,
         session: (any Session)? = nil,
         observer: (any AgentObserver)? = nil
@@ -150,7 +150,7 @@ public struct GraphAgent: AgentRuntime, Sendable {
     ///   - session: Ignored. Hive manages its own thread-based state.
     ///   - observer: Optional observer for lifecycle callbacks.
     /// - Returns: An async stream of `AgentEvent`.
-    nonisolated public func stream(
+    nonisolated func stream(
         _ input: String,
         session: (any Session)? = nil,
         observer: (any AgentObserver)? = nil
@@ -257,7 +257,7 @@ public struct GraphAgent: AgentRuntime, Sendable {
     }
 
     /// Cancels any ongoing Hive run.
-    public func cancel() async {
+    func cancel() async {
         await cancellation.cancelCurrent()
     }
 

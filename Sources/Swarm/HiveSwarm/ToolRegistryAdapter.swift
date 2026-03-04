@@ -2,7 +2,7 @@ import Foundation
 import HiveCore
 import Swarm
 
-public enum ToolRegistryAdapterError: Error, Equatable, Sendable {
+enum ToolRegistryAdapterError: Error, Equatable, Sendable {
     case invalidArgumentsJSON
     case argumentsMustBeJSONObject
     case resultEncodingFailed
@@ -15,11 +15,11 @@ public enum ToolRegistryAdapterError: Error, Equatable, Sendable {
 /// Bridges Swarm tools into HiveCore's `HiveToolRegistry` interface.
 ///
 /// This adapter snapshots tools at initialization time so `listTools()` can remain synchronous.
-public struct ToolRegistryAdapter: HiveToolRegistry, Sendable {
+struct ToolRegistryAdapter: HiveToolRegistry, Sendable {
     private let registry: ToolRegistry
     private let toolDefinitions: [HiveToolDefinition]
 
-    public init(tools: [any AnyJSONTool]) throws {
+    init(tools: [any AnyJSONTool]) throws {
         let registry: ToolRegistry
         do {
             registry = try ToolRegistry(tools: tools)
@@ -35,7 +35,7 @@ public struct ToolRegistryAdapter: HiveToolRegistry, Sendable {
             .sorted { $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) }
     }
 
-    public static func fromRegistry(_ registry: ToolRegistry) async throws -> Self {
+    static func fromRegistry(_ registry: ToolRegistry) async throws -> Self {
         let schemas = await registry.schemas
         let definitions = try schemas
             .map { try Self.makeToolDefinition(for: $0) }
@@ -43,11 +43,11 @@ public struct ToolRegistryAdapter: HiveToolRegistry, Sendable {
         return ToolRegistryAdapter(registry: registry, toolDefinitions: definitions)
     }
 
-    public func listTools() -> [HiveToolDefinition] {
+    func listTools() -> [HiveToolDefinition] {
         toolDefinitions
     }
 
-    public func invoke(_ call: HiveToolCall) async throws -> HiveToolResult {
+    func invoke(_ call: HiveToolCall) async throws -> HiveToolResult {
         let arguments = try Self.parseArgumentsJSON(call.argumentsJSON)
 
         guard await registry.contains(named: call.name) else {

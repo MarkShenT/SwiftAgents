@@ -6,7 +6,7 @@
 import Foundation
 import Testing
 @testable import Swarm
-import SwarmHive
+@testable import SwarmHive
 
 @Suite("RetryPolicyBridge — Swarm to Hive mapping")
 struct RetryPolicyBridgeTests {

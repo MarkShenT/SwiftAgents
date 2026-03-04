@@ -5,14 +5,14 @@ import Swarm
 
 // MARK: - EventSchemaVersion
 
-public enum EventSchemaVersion: Sendable {
-    public static let metadataKey = "hive.eventSchemaVersion"
-    public static let current = "hsw.v1"
+enum EventSchemaVersion: Sendable {
+    static let metadataKey = "hive.eventSchemaVersion"
+    static let current = "hsw.v1"
 }
 
 // MARK: - HiveCheckpointQueryCapability
 
-public enum HiveCheckpointQueryCapability: Sendable, Equatable {
+enum HiveCheckpointQueryCapability: Sendable, Equatable {
     case unavailable
     case latestOnly
     case queryable
@@ -20,7 +20,7 @@ public enum HiveCheckpointQueryCapability: Sendable, Equatable {
 
 // MARK: - HiveStateSnapshotSource
 
-public enum HiveStateSnapshotSource: Sendable, Equatable {
+enum HiveStateSnapshotSource: Sendable, Equatable {
     case memory
     case checkpoint
     case memoryAndCheckpoint
@@ -29,13 +29,13 @@ public enum HiveStateSnapshotSource: Sendable, Equatable {
 
 // MARK: - HiveRuntimeFrontierSummary
 
-public struct HiveRuntimeFrontierSummary: Sendable, Equatable {
-    public struct Entry: Sendable, Equatable {
-        public let nodeID: HiveNodeID
-        public let provenance: HiveTaskProvenance
-        public let localFingerprintHash: String
+struct HiveRuntimeFrontierSummary: Sendable, Equatable {
+    struct Entry: Sendable, Equatable {
+        let nodeID: HiveNodeID
+        let provenance: HiveTaskProvenance
+        let localFingerprintHash: String
 
-        public init(
+        init(
             nodeID: HiveNodeID,
             provenance: HiveTaskProvenance,
             localFingerprintHash: String
@@ -46,11 +46,11 @@ public struct HiveRuntimeFrontierSummary: Sendable, Equatable {
         }
     }
 
-    public let count: Int
-    public let hash: String
-    public let entries: [Entry]
+    let count: Int
+    let hash: String
+    let entries: [Entry]
 
-    public init(count: Int, hash: String, entries: [Entry]) {
+    init(count: Int, hash: String, entries: [Entry]) {
         self.count = count
         self.hash = hash
         self.entries = entries
@@ -59,21 +59,21 @@ public struct HiveRuntimeFrontierSummary: Sendable, Equatable {
 
 // MARK: - HiveRuntimeChannelStateSummary
 
-public struct HiveRuntimeChannelStateSummary: Sendable, Equatable {
-    public struct Entry: Sendable, Equatable {
-        public let channelID: HiveChannelID
-        public let payloadHash: String
+struct HiveRuntimeChannelStateSummary: Sendable, Equatable {
+    struct Entry: Sendable, Equatable {
+        let channelID: HiveChannelID
+        let payloadHash: String
 
-        public init(channelID: HiveChannelID, payloadHash: String) {
+        init(channelID: HiveChannelID, payloadHash: String) {
             self.channelID = channelID
             self.payloadHash = payloadHash
         }
     }
 
-    public let hash: String
-    public let entries: [Entry]
+    let hash: String
+    let entries: [Entry]
 
-    public init(hash: String, entries: [Entry]) {
+    init(hash: String, entries: [Entry]) {
         self.hash = hash
         self.entries = entries
     }
@@ -81,11 +81,11 @@ public struct HiveRuntimeChannelStateSummary: Sendable, Equatable {
 
 // MARK: - HiveRuntimeInterruptionSummary
 
-public struct HiveRuntimeInterruptionSummary<Schema: HiveSchema>: Sendable, Equatable {
-    public let interruptID: HiveInterruptID
-    public let payloadHash: String?
+struct HiveRuntimeInterruptionSummary<Schema: HiveSchema>: Sendable, Equatable {
+    let interruptID: HiveInterruptID
+    let payloadHash: String?
 
-    public init(interruptID: HiveInterruptID, payloadHash: String?) {
+    init(interruptID: HiveInterruptID, payloadHash: String?) {
         self.interruptID = interruptID
         self.payloadHash = payloadHash
     }
@@ -93,18 +93,18 @@ public struct HiveRuntimeInterruptionSummary<Schema: HiveSchema>: Sendable, Equa
 
 // MARK: - HiveRuntimeStateSnapshot
 
-public struct HiveRuntimeStateSnapshot<Schema: HiveSchema>: Sendable, Equatable {
-    public let threadID: HiveThreadID
-    public let runID: HiveRunID?
-    public let stepIndex: Int?
-    public let interruption: HiveRuntimeInterruptionSummary<Schema>?
-    public let checkpointID: HiveCheckpointID?
-    public let frontier: HiveRuntimeFrontierSummary
-    public let channelState: HiveRuntimeChannelStateSummary?
-    public let eventSchemaVersion: String
-    public let source: HiveStateSnapshotSource
+struct HiveRuntimeStateSnapshot<Schema: HiveSchema>: Sendable, Equatable {
+    let threadID: HiveThreadID
+    let runID: HiveRunID?
+    let stepIndex: Int?
+    let interruption: HiveRuntimeInterruptionSummary<Schema>?
+    let checkpointID: HiveCheckpointID?
+    let frontier: HiveRuntimeFrontierSummary
+    let channelState: HiveRuntimeChannelStateSummary?
+    let eventSchemaVersion: String
+    let source: HiveStateSnapshotSource
 
-    public init(
+    init(
         threadID: HiveThreadID,
         runID: HiveRunID?,
         stepIndex: Int?,
@@ -129,15 +129,15 @@ public struct HiveRuntimeStateSnapshot<Schema: HiveSchema>: Sendable, Equatable 
 
 // MARK: - HiveCanonicalEventRecord
 
-public struct HiveCanonicalEventRecord: Sendable, Codable, Equatable {
-    public let eventIndex: UInt64
-    public let stepIndex: Int?
-    public let taskOrdinal: Int?
-    public let kind: String
-    public let attributes: [String: String]
-    public let metadata: [String: String]
+struct HiveCanonicalEventRecord: Sendable, Codable, Equatable {
+    let eventIndex: UInt64
+    let stepIndex: Int?
+    let taskOrdinal: Int?
+    let kind: String
+    let attributes: [String: String]
+    let metadata: [String: String]
 
-    public init(
+    init(
         eventIndex: UInt64,
         stepIndex: Int?,
         taskOrdinal: Int?,
@@ -156,11 +156,11 @@ public struct HiveCanonicalEventRecord: Sendable, Codable, Equatable {
 
 // MARK: - HiveCanonicalTranscript
 
-public struct HiveCanonicalTranscript: Sendable, Codable, Equatable {
-    public let schemaVersion: String
-    public let events: [HiveCanonicalEventRecord]
+struct HiveCanonicalTranscript: Sendable, Codable, Equatable {
+    let schemaVersion: String
+    let events: [HiveCanonicalEventRecord]
 
-    public init(schemaVersion: String, events: [HiveCanonicalEventRecord]) {
+    init(schemaVersion: String, events: [HiveCanonicalEventRecord]) {
         self.schemaVersion = schemaVersion
         self.events = events
     }
@@ -168,12 +168,12 @@ public struct HiveCanonicalTranscript: Sendable, Codable, Equatable {
 
 // MARK: - HiveDeterminismDiff
 
-public struct HiveDeterminismDiff: Sendable, Equatable {
-    public let path: String
-    public let expected: String
-    public let actual: String
+struct HiveDeterminismDiff: Sendable, Equatable {
+    let path: String
+    let expected: String
+    let actual: String
 
-    public init(path: String, expected: String, actual: String) {
+    init(path: String, expected: String, actual: String) {
         self.path = path
         self.expected = expected
         self.actual = actual
@@ -182,14 +182,14 @@ public struct HiveDeterminismDiff: Sendable, Equatable {
 
 // MARK: - HiveTranscriptCompatibilityError
 
-public enum HiveTranscriptCompatibilityError: Error, Sendable, Equatable {
+enum HiveTranscriptCompatibilityError: Error, Sendable, Equatable {
     case missingSchemaVersion(eventIndex: Int)
     case incompatibleSchemaVersion(expected: String, found: String, eventIndex: Int)
 }
 
 // MARK: - HiveCancelCheckpointResolution
 
-public enum HiveCancelCheckpointResolution: Sendable, Equatable {
+enum HiveCancelCheckpointResolution: Sendable, Equatable {
     case notCancelled
     case cancelledWithoutCheckpoint(latestCheckpointID: HiveCheckpointID?)
     case cancelledAfterCheckpointSaved(checkpointID: HiveCheckpointID)
@@ -197,10 +197,10 @@ public enum HiveCancelCheckpointResolution: Sendable, Equatable {
 
 // MARK: - HiveDeterminism
 
-public enum HiveDeterminism {
-    // MARK: Public
+enum HiveDeterminism {
+    // MARK: Internal
 
-    public static func projectTranscript(
+    static func projectTranscript(
         _ events: [HiveEvent],
         expectedSchemaVersion: String = EventSchemaVersion.current
     ) throws -> HiveCanonicalTranscript {
@@ -250,7 +250,7 @@ public enum HiveDeterminism {
         )
     }
 
-    public static func transcriptHash(
+    static func transcriptHash(
         _ events: [HiveEvent],
         expectedSchemaVersion: String = EventSchemaVersion.current
     ) throws -> String {
@@ -291,7 +291,7 @@ public enum HiveDeterminism {
         return try hashEncodable(projection)
     }
 
-    public static func finalStateHash(
+    static func finalStateHash(
         _ snapshot: HiveRuntimeStateSnapshot<some HiveSchema>,
         includeRuntimeIdentity: Bool = false
     ) throws -> String {
@@ -321,7 +321,7 @@ public enum HiveDeterminism {
         return try hashEncodable(canonical)
     }
 
-    public static func firstTranscriptDiff(
+    static func firstTranscriptDiff(
         expected: HiveCanonicalTranscript,
         actual: HiveCanonicalTranscript
     ) -> HiveDeterminismDiff? {
@@ -375,7 +375,7 @@ public enum HiveDeterminism {
         return nil
     }
 
-    public static func firstStateDiff<Schema: HiveSchema>(
+    static func firstStateDiff<Schema: HiveSchema>(
         expected: HiveRuntimeStateSnapshot<Schema>,
         actual: HiveRuntimeStateSnapshot<Schema>,
         includeRuntimeIdentity: Bool = false
@@ -480,7 +480,7 @@ public enum HiveDeterminism {
         return nil
     }
 
-    public static func classifyCancelCheckpointRace(
+    static func classifyCancelCheckpointRace(
         events: [HiveEvent],
         outcome: HiveRunOutcome<some HiveSchema>
     ) -> HiveCancelCheckpointResolution {
@@ -681,7 +681,7 @@ private struct HiveTranscriptHashEventRecord: Codable, Sendable, Equatable {
     }
 }
 
-public extension GraphRunController {
+extension GraphRunController {
     // MARK: Internal
 
     static func decorate(event: HiveEvent) -> HiveEvent {
@@ -1137,7 +1137,7 @@ public extension GraphRunController {
     }
 }
 
-public extension HiveRuntime where Schema == ChatGraph.Schema {
+extension HiveRuntime where Schema == ChatGraph.Schema {
     func getState(
         threadID: HiveThreadID
     ) async throws -> HiveRuntimeStateSnapshot<Schema>? {

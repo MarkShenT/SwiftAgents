@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 @testable import Swarm
-import SwarmHive
+@testable import SwarmHive
 import Testing
 
 // MARK: - HiveAgentsTests
