@@ -239,7 +239,40 @@ Structured merge strategy builds a JSON dictionary, serializes to `Data`, then c
 
 ## 6. Security Risks
 
-### 6.1 HIGH: WebSearchTool Accepts Unbounded Input
+### 6.1 HIGH: Path Traversal Bypass in HTTPMCPServer
+
+**File:** `Sources/Swarm/MCP/HTTPMCPServer.swift:210-231`
+
+The `readResource(uri:)` method checks for path traversal with a simple string literal match:
+
+```swift
+guard !uri.contains("..") else {
+    throw MCPError.invalidParams("Path traversal not allowed")
+}
+```
+
+This is **bypassable via URL encoding** (`%2E%2E`), double encoding (`%252E%252E`), or Unicode normalization. Additionally, `file://` URI validation only checks the prefix — no allowlist of accessible directories, no symlink resolution.
+
+**Remediation:** Use Swift's `URL` path component API, resolve canonical paths with `realpath(3)`, implement an allowlist of accessible directories.
+
+### 6.2 HIGH: Error Information Disclosure Across Multiple Subsystems
+
+**Files:**
+- `Sources/Swarm/MCP/MCPClient.swift:510-523` — leaks server names and error conditions in aggregated errors
+- `Sources/Swarm/Providers/OpenRouter/OpenRouterProvider.swift:100-102` — exposes raw HTTP response body (500 chars) in thrown errors
+
+```swift
+// OpenRouter: raw response leaked in error message
+throw AgentError.generationFailed(
+    reason: "Failed to decode response: \(error.localizedDescription). Raw response: \(rawResponse.prefix(500))"
+)
+```
+
+Raw API responses may contain stack traces, SQL errors, internal IP addresses, or third-party credentials. Server names in MCP error aggregation reveal service topology.
+
+**Remediation:** Log detailed errors internally only. Return opaque error IDs to callers. Sanitize all error messages before propagation.
+
+### 6.3 HIGH: WebSearchTool Accepts Unbounded Input
 
 **File:** `Sources/Swarm/Tools/WebSearchTool.swift:66-143`
 
@@ -287,13 +320,27 @@ while true {
 
 No upper bound on iteration. While theoretically bounded by `Int.max`, this is a DoS vector if `usedNames` is externally influenced.
 
-### 6.5 MEDIUM: OpenRouter API Key in Request Headers
+### 6.5 MEDIUM: No HTTPS Enforcement in OpenRouter Provider
 
-**File:** `Sources/Swarm/Providers/OpenRouter/OpenRouterProvider.swift`
+**File:** `Sources/Swarm/Providers/OpenRouter/OpenRouterConfiguration.swift`
 
-API keys are passed in HTTP headers (standard practice), but error responses that include request details could leak keys. Error messages from the provider should be sanitized before propagation.
+While the default `baseURL` is HTTPS, there is no validation preventing override to HTTP. A developer could set `baseURL` to an HTTP endpoint, transmitting API keys in plaintext. `HTTPMCPServer` enforces HTTPS when an API key is present, but `OpenRouterProvider` does not.
 
-### 6.6 MEDIUM: JSONMetricsReporter File Path Injection
+### 6.6 MEDIUM: MultiProvider Model Name Injection
+
+**File:** `Sources/Swarm/Providers/MultiProvider.swift:274-289`
+
+`parseModelName()` performs no validation that model names don't contain dangerous characters (newlines, null bytes, control characters). Model names are passed downstream to HTTP requests. If used in request headers, this could enable HTTP header injection.
+
+**Remediation:** Validate model names against `^[a-zA-Z0-9._/-]+$`, enforce max length.
+
+### 6.7 MEDIUM: MCP Tool Results Have No Size Limit
+
+**File:** `Sources/SwarmMCP/SwarmMCPErrorMapper.swift:61-91`
+
+Tool execution results are mapped to MCP responses with no size enforcement. A tool returning gigabytes of data would cause memory exhaustion during JSON encoding.
+
+### 6.8 MEDIUM: JSONMetricsReporter File Path Injection
 
 **File:** `Sources/Swarm/Observability/MetricsCollector.swift:502-505`
 
@@ -453,9 +500,9 @@ This target is appended unconditionally (not gated by any flag), while `SwarmDem
 | Severity | Count | Categories |
 |----------|-------|------------|
 | **BLOCKER** | 4 | Runtime crash, NSLock deadlocks, infinite loops, stack overflow |
-| **MAJOR** | 12 | Data loss, race conditions, missing tests, error swallowing, security gaps |
-| **MINOR** | 10 | Config validation, unnecessary wrappers, stub files, performance |
-| **Total** | 26 | |
+| **MAJOR** | 16 | Data loss, race conditions, missing tests, error swallowing, path traversal, info disclosure, injection |
+| **MINOR** | 11 | Config validation, unnecessary wrappers, stub files, performance |
+| **Total** | 31 | |
 
 ---
 
@@ -476,6 +523,10 @@ This target is appended unconditionally (not gated by any flag), while `SwarmDem
 8. Add handoff context key validation/whitelisting
 9. Replace critical `try?` patterns with proper error handling
 10. Standardize stream creation on `StreamHelper.makeTrackedStream()`
+11. Fix path traversal bypass in HTTPMCPServer — use canonical path resolution
+12. Sanitize error messages — remove raw API responses, server names from thrown errors
+13. Validate model names in MultiProvider against safe character pattern
+14. Add tool result size limits in MCP error mapper
 
 ### Medium-Term (Week 4-6)
 
