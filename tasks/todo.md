@@ -101,7 +101,7 @@
 - [x] Add failing tests for HTTPMCPServer insecure API key handling, ZoniSearchTool unconfigured behavior, and Membrane adapter checkpoint roundtrip.
 - [x] Implement fixes in MCP, Tools, Membrane integration, and FoundationModels streaming cancellation.
 - [x] Run focused suites, then full `swift test` and `swift build`.
-- [ ] Commit with detailed message; attempt push + PR creation.
+- [x] Commit with detailed message; attempt push + PR creation. (PR #53 opened; labeling blocked by transient GitHub API connectivity in this environment)
 
 # Review (Framework Issue Audit - 2026-03-08)
 - Fixed HTTP MCP configuration safety:
