@@ -7,6 +7,9 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 
+# Git worktrees
+.worktrees/
+
 # Code Coverage
 *.profdata
 *.profraw
