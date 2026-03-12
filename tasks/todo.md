@@ -102,7 +102,7 @@
 - [x] Add failing-first regression tests for each confirmed defect.
 - [x] Implement minimal production-grade fixes and keep API/type safety strong.
 - [x] Run focused tests, then full `swift build` and `swift test` to verify no regressions.
-- [ ] Commit with detailed message, push branch, and open PR.
+- [x] Commit with detailed message, push branch, and open PR.
 
 # Review (Framework Issue Audit - 2026-03-12)
 - Audit focus selected from baseline + subagent pass:
@@ -128,3 +128,8 @@
   - `swift test --filter AgentResponseContinuationTests --filter AgentConfigurationInferenceOptionsTests` ✅
   - `swift build` ✅
   - `swift test` ✅ (1990 tests, 0 failures)
+- Delivery:
+  - Commit: `a4d1e24` (`Wire response continuation through agent runtime`)
+  - Branch: `automation/check-frameworks-audit-20260312`
+  - PR: https://github.com/christopherkarani/Swarm/pull/56
+  - Follow-up: adding `codex` and `codex-automation` labels failed in this environment due transient GitHub API connectivity error.
