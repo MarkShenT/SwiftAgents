@@ -251,6 +251,11 @@ public func Parameter(
 /// ```
 @resultBuilder
 public struct ToolBuilder {
+    /// Builds an empty tool array for empty builder bodies.
+    public static func buildBlock() -> [any AnyJSONTool] {
+        []
+    }
+
     /// Builds a tool array from multiple tools.
     public static func buildBlock(_ components: (any AnyJSONTool)...) -> [any AnyJSONTool] {
         components
