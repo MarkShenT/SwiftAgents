@@ -79,40 +79,6 @@ struct V2SurfaceAuditTests {
         let _: MCPClientConfig.Type = MCPClientConfig.self
     }
 
-    // MARK: - Deprecated typealiases bridge the gap
-
-    @Test("AgentMemoryComponent deprecated typealias compiles")
-    func agentMemoryComponentTypealias() {
-        let memory = ConversationMemory()
-        let component = AgentMemoryComponent(memory)
-        _ = component
-    }
-
-    @Test("TracerComponent deprecated typealias metatype compiles")
-    func tracerComponentTypealias() {
-        let _: TracerComponent.Type = TracerComponent.self
-    }
-
-    @Test("InputGuardrailsComponent deprecated typealias compiles")
-    func inputGuardrailsComponentTypealias() {
-        let _: InputGuardrailsComponent.Type = InputGuardrailsComponent.self
-    }
-
-    @Test("OutputGuardrailsComponent deprecated typealias compiles")
-    func outputGuardrailsComponentTypealias() {
-        let _: OutputGuardrailsComponent.Type = OutputGuardrailsComponent.self
-    }
-
-    @Test("HandoffsComponent deprecated typealias compiles")
-    func handoffsComponentTypealias() {
-        let _: HandoffsComponent.Type = HandoffsComponent.self
-    }
-
-    @Test("MCPClientComponent deprecated typealias compiles")
-    func mcpClientComponentTypealias() {
-        let _: MCPClientComponent.Type = MCPClientComponent.self
-    }
-
     // MARK: - MemoryMessage.formatContext (free function → static method)
 
     @Test("MemoryMessage.formatContext static method is public")

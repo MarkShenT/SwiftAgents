@@ -97,9 +97,6 @@ public struct AgentMemory: AgentComponent {
     }
 }
 
-@available(*, deprecated, renamed: "AgentMemory")
-public typealias AgentMemoryComponent = AgentMemory
-
 // MARK: - Configuration
 
 /// Configuration component for agent settings.
@@ -176,9 +173,6 @@ public struct TracerConfig: AgentComponent {
     }
 }
 
-@available(*, deprecated, renamed: "TracerConfig")
-public typealias TracerComponent = TracerConfig
-
 // MARK: - InputGuardrails
 
 /// Input guardrails component for validating agent inputs.
@@ -209,9 +203,6 @@ public struct InputGuardrails: AgentComponent {
     }
 }
 
-@available(*, deprecated, renamed: "InputGuardrails")
-public typealias InputGuardrailsComponent = InputGuardrails
-
 // MARK: - OutputGuardrails
 
 /// Output guardrails component for validating agent outputs.
@@ -241,9 +232,6 @@ public struct OutputGuardrails: AgentComponent {
         self.guardrails = guardrails
     }
 }
-
-@available(*, deprecated, renamed: "OutputGuardrails")
-public typealias OutputGuardrailsComponent = OutputGuardrails
 
 // MARK: - Handoffs
 
@@ -292,9 +280,6 @@ public struct Handoffs: AgentComponent, Sendable {
         handoffs = result
     }
 }
-
-@available(*, deprecated, renamed: "Handoffs")
-public typealias HandoffsComponent = Handoffs
 
 // MARK: - ParallelToolCalls
 
@@ -431,9 +416,6 @@ public struct MCPClientConfig: AgentComponent {
         self.client = client
     }
 }
-
-@available(*, deprecated, renamed: "MCPClientConfig")
-public typealias MCPClientComponent = MCPClientConfig
 
 // MARK: - AgentBuilder
 
