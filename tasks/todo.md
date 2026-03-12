@@ -95,3 +95,36 @@
 - `swift build` passes.
 - `swift test` fails in this sandbox due filesystem exhaustion while compiling dependency test artifacts:
   `No space left on device`.
+
+# Task Plan (Framework Issue Audit - 2026-03-12)
+- [x] Reproduce baseline with `swift build` + `swift test` and capture failures.
+- [x] Run parallel mission-critical audit for correctness, concurrency, dead code, and missing wiring.
+- [x] Add failing-first regression tests for each confirmed defect.
+- [x] Implement minimal production-grade fixes and keep API/type safety strong.
+- [x] Run focused tests, then full `swift build` and `swift test` to verify no regressions.
+- [ ] Commit with detailed message, push branch, and open PR.
+
+# Review (Framework Issue Audit - 2026-03-12)
+- Audit focus selected from baseline + subagent pass:
+  - `previousResponseId` / `autoPreviousResponseId` were exposed in `AgentConfiguration` but not propagated through runtime `InferenceOptions` and run-path execution.
+  - no-tools generation path bypassed a unified inference-options pipeline for continuation metadata.
+- Changes implemented:
+  - `Sources/Swarm/Core/AgentRuntime.swift`: added `InferenceOptions.previousResponseId`.
+  - `Sources/Swarm/Core/AgentConfiguration+InferenceOptions.swift`: propagated `AgentConfiguration.previousResponseId` into resolved `InferenceOptions`.
+  - `Sources/Swarm/Agents/Agent.swift`:
+    - added `runWithResponse` actor override so `response.id` metadata is reused in returned `AgentResponse`.
+    - added per-session auto-response tracking via shared `ResponseTracker` when `autoPreviousResponseId` is enabled.
+    - resolved inference options per-run/session (`resolvedInferenceOptions(session:)`), including explicit-id precedence and auto-tracked fallback.
+    - threaded resolved inference options through tool and non-tool generation paths.
+    - recorded deterministic `response.id` metadata for each run.
+- Tests added/updated:
+  - `Tests/SwarmTests/Agents/AgentResponseContinuationTests.swift` (new):
+    - `runWithResponseAutoTracksPreviousResponseID`
+    - `runAutoTracksSyntheticResponseID`
+    - `explicitPreviousResponseIDWins`
+  - `Tests/SwarmTests/Core/AgentConfigurationInferenceOptionsTests.swift`:
+    - verifies base inference options propagate `previousResponseId`.
+- Verification:
+  - `swift test --filter AgentResponseContinuationTests --filter AgentConfigurationInferenceOptionsTests` ✅
+  - `swift build` ✅
+  - `swift test` ✅ (1990 tests, 0 failures)
