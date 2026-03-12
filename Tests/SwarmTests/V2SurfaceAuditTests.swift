@@ -45,40 +45,6 @@ struct V2SurfaceAuditTests {
         #expect(decoded == usage)
     }
 
-    // MARK: - AgentBuilder DSL — renamed Component types (top-level module types)
-
-    @Test("AgentMemory is public (renamed from AgentMemoryComponent)")
-    func agentMemoryPublic() {
-        let memory = ConversationMemory()
-        let component = AgentMemory(memory)
-        _ = component
-    }
-
-    @Test("TracerConfig metatype is accessible")
-    func tracerConfigPublic() {
-        let _: TracerConfig.Type = TracerConfig.self
-    }
-
-    @Test("InputGuardrails metatype is accessible")
-    func inputGuardrailsPublic() {
-        let _: InputGuardrails.Type = InputGuardrails.self
-    }
-
-    @Test("OutputGuardrails metatype is accessible")
-    func outputGuardrailsPublic() {
-        let _: OutputGuardrails.Type = OutputGuardrails.self
-    }
-
-    @Test("Handoffs metatype is accessible")
-    func handoffsPublic() {
-        let _: Handoffs.Type = Handoffs.self
-    }
-
-    @Test("MCPClientConfig metatype is accessible")
-    func mcpClientConfigPublic() {
-        let _: MCPClientConfig.Type = MCPClientConfig.self
-    }
-
     // MARK: - MemoryMessage.formatContext (free function → static method)
 
     @Test("MemoryMessage.formatContext static method is public")

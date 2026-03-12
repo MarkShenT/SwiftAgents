@@ -1487,60 +1487,6 @@ public extension Agent {
     }
 }
 
-// MARK: - Agent DSL Extension
-
-public extension Agent {
-    /// Creates an Agent using the declarative builder DSL.
-    ///
-    /// Example:
-    /// ```swift
-    /// let agent = Agent {
-    ///     Instructions("You are a helpful assistant.")
-    ///
-    ///     Tools {
-    ///         WeatherTool()
-    ///         CalculatorTool()
-    ///     }
-    ///
-    ///     Configuration(.default.maxIterations(5))
-    /// }
-    /// ```
-    ///
-    /// - Parameter content: A closure that builds the agent components.
-    /// - Throws: `ToolRegistryError.duplicateToolName` if duplicate tool names are provided.
-    init(@AgentBuilder _ content: () -> AgentBuilder.Components) throws {
-        let components = content()
-
-        // Merge Phase 5/6 builder settings into configuration
-        var config = components.configuration ?? .default
-        if let modelSettings = components.modelSettings {
-            config.modelSettings = modelSettings
-        }
-        if let parallelToolCalls = components.parallelToolCalls {
-            config.parallelToolCalls = parallelToolCalls
-        }
-        if let previousResponseId = components.previousResponseId {
-            config.previousResponseId = previousResponseId
-        }
-        if let autoPreviousResponseId = components.autoPreviousResponseId {
-            config.autoPreviousResponseId = autoPreviousResponseId
-        }
-
-        try self.init(
-            tools: components.tools,
-            instructions: components.instructions ?? "",
-            configuration: config,
-            memory: components.memory,
-            inferenceProvider: components.inferenceProvider,
-            tracer: components.tracer,
-            inputGuardrails: components.inputGuardrails,
-            outputGuardrails: components.outputGuardrails,
-            guardrailRunnerConfiguration: components.guardrailRunnerConfiguration ?? .default,
-            handoffs: components.handoffs
-        )
-    }
-}
-
 // MARK: - Convenience Initializers
 
 public extension Agent {

@@ -207,29 +207,32 @@ struct ModelSettingsIntegrationTests {
     }
 }
 
-// MARK: - AgentBuilderIntegrationTests
+// MARK: - AgentModelSettingsIntegrationTests
 
-@Suite("AgentBuilder Integration")
-struct AgentBuilderIntegrationTests {
-    @Test("AgentBuilder with ModelSettingsComponent works")
-    func agentBuilderWithModelSettings() async throws {
-        let agent = try Agent {
-            Instructions("Precise agent.")
-            ModelSettingsComponent(.precise.maxTokens(1500))
-        }
+@Suite("Agent Model Settings Integration")
+struct AgentModelSettingsIntegrationTests {
+    @Test("Agent with ModelSettings works via direct init")
+    func agentWithModelSettings() async throws {
+        let config = AgentConfiguration.default.modelSettings(.precise.maxTokens(1500))
+        let agent = try Agent(
+            instructions: "Precise agent.",
+            configuration: config
+        )
 
         #expect(agent.configuration.modelSettings?.temperature == 0.2)
         #expect(agent.configuration.modelSettings?.topP == 0.9)
         #expect(agent.configuration.modelSettings?.maxTokens == 1500)
     }
 
-    @Test("AgentBuilder configuration merge works correctly")
-    func agentBuilderConfigurationMerge() async throws {
-        let agent = try Agent {
-            Instructions("Merged settings agent.")
-            Configuration(.default.maxIterations(15))
-            ModelSettingsComponent(.balanced.parallelToolCalls(true))
-        }
+    @Test("Agent configuration merge works correctly via direct init")
+    func agentConfigurationMerge() async throws {
+        let config = AgentConfiguration.default
+            .maxIterations(15)
+            .modelSettings(.balanced.parallelToolCalls(true))
+        let agent = try Agent(
+            instructions: "Merged settings agent.",
+            configuration: config
+        )
 
         #expect(agent.configuration.maxIterations == 15)
         #expect(agent.configuration.modelSettings?.temperature == 0.7)

@@ -17,8 +17,11 @@ import Testing
 // AnyTool — must not exist after Task 3
 // let _: AnyTool = AnyTool(someTool)
 
-// AgentBuilder — must not exist after Task 5
-// let _: AgentBuilder<AgentConfiguration> = AgentBuilder()
+// AgentBuilder — removed in Task 5 (AgentBuilder.swift deleted)
+// Verified: AgentBuilder, Instructions, Tools, AgentMemory, Configuration,
+// InferenceProviderComponent, TracerConfig, InputGuardrails, OutputGuardrails,
+// Handoffs, ParallelToolCalls, PreviousResponseId, AutoPreviousResponseId,
+// ModelSettingsComponent, MCPClientConfig — all removed.
 
 @Suite("V3 Zombie API Removal")
 struct ZombieAPIRemovalTests {

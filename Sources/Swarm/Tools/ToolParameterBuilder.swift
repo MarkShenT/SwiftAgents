@@ -238,8 +238,6 @@ public func Parameter(
 
 /// A result builder for constructing arrays of tools.
 ///
-/// Used by `AgentBuilder` to allow declarative tool registration.
-///
 /// Example:
 /// ```swift
 /// @ToolArrayBuilder
