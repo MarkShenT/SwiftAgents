@@ -233,6 +233,56 @@ public actor Agent: AgentRuntime {
         )
     }
 
+    // MARK: - V3 Canonical Init
+
+    /// V3 canonical initializer — instructions-first, `@ToolBuilder` trailing closure.
+    ///
+    /// This is the recommended path for creating agents in V3:
+    /// ```swift
+    /// let agent = try Agent("You are a helpful assistant.") {
+    ///     WeatherTool()
+    ///     SearchTool()
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - instructions: System instructions defining agent behavior.
+    ///   - configuration: Agent configuration settings. Default: `.default`
+    ///   - memory: Optional memory system. Default: `nil`
+    ///   - inferenceProvider: Optional custom inference provider. Default: `nil`
+    ///   - tracer: Optional tracer for observability. Default: `nil`
+    ///   - inputGuardrails: Input validation guardrails. Default: `[]`
+    ///   - outputGuardrails: Output validation guardrails. Default: `[]`
+    ///   - guardrailRunnerConfiguration: Configuration for guardrail runner. Default: `.default`
+    ///   - handoffs: Handoff configurations for multi-agent orchestration. Default: `[]`
+    ///   - tools: A `@ToolBuilder` closure producing the agent's tools. Default: empty.
+    /// - Throws: `ToolRegistryError.duplicateToolName` if duplicate tool names are provided.
+    public init(
+        _ instructions: String,
+        configuration: AgentConfiguration = .default,
+        memory: (any Memory)? = nil,
+        inferenceProvider: (any InferenceProvider)? = nil,
+        tracer: (any Tracer)? = nil,
+        inputGuardrails: [any InputGuardrail] = [],
+        outputGuardrails: [any OutputGuardrail] = [],
+        guardrailRunnerConfiguration: GuardrailRunnerConfiguration = .default,
+        handoffs: [AnyHandoffConfiguration] = [],
+        @ToolBuilder tools: () -> [any AnyJSONTool] = { [] }
+    ) throws {
+        try self.init(
+            tools: tools(),
+            instructions: instructions,
+            configuration: configuration,
+            memory: memory,
+            inferenceProvider: inferenceProvider,
+            tracer: tracer,
+            inputGuardrails: inputGuardrails,
+            outputGuardrails: outputGuardrails,
+            guardrailRunnerConfiguration: guardrailRunnerConfiguration,
+            handoffs: handoffs
+        )
+    }
+
     // MARK: - Agent Protocol Methods
 
     /// Executes the agent with the given input and returns a result.
