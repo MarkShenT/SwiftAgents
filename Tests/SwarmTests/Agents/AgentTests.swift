@@ -13,9 +13,9 @@ import Testing
 struct ReActAgentTests {
     @Test("Simple query returns final answer")
     func simpleQuery() async throws {
-        // Create a mock provider that immediately returns a final answer
+        // Create a mock provider that immediately returns a response
         let mockProvider = MockInferenceProvider(responses: [
-            "Final Answer: 42"
+            "42"
         ])
 
         // Create agent with the mock provider
@@ -28,8 +28,8 @@ struct ReActAgentTests {
         // Run the agent
         let result = try await agent.run("What is the answer?")
 
-        // Verify the output — Agent returns the raw model response (not parsed like ReActAgent did)
-        #expect(result.output == "Final Answer: 42")
+        // Verify the output — Agent returns the raw model response
+        #expect(result.output == "42")
         #expect(result.iterationCount == 1)
         #expect(await mockProvider.generateCallCount == 1)
     }
@@ -56,7 +56,7 @@ struct ReActAgentTests {
                 usage: nil
             ),
             InferenceResponse(
-                content: "Final Answer: Done",
+                content: "Done",
                 toolCalls: [],
                 finishReason: .completed,
                 usage: nil
@@ -90,14 +90,17 @@ struct ReActAgentTests {
 
     @Test("Max iterations exceeded")
     func maxIterationsExceeded() async throws {
-        // Create mock provider that never provides a final answer
+        // Create mock provider that always returns tool calls (never a final text response)
         let mockProvider = MockInferenceProvider()
-        await mockProvider.configureInfiniteThinking(thoughts: ["Still thinking..."])
+        await mockProvider.configureInfiniteToolCalling(toolName: "noop")
+
+        // A no-op tool so the agent enters the tool-calling path
+        let noopTool = MockTool(name: "noop", description: "Does nothing")
 
         // Create agent with maxIterations=1
         let config = AgentConfiguration.default.maxIterations(1)
         let agent = try Agent(
-            tools: [],
+            tools: [noopTool],
             instructions: "You are a helpful assistant.",
             configuration: config,
             inferenceProvider: mockProvider

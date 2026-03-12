@@ -1425,10 +1425,26 @@ public extension Agent {
     /// - Throws: `ToolRegistryError.duplicateToolName` if duplicate tool names are provided.
     init(@AgentBuilder _ content: () -> AgentBuilder.Components) throws {
         let components = content()
+
+        // Merge Phase 5/6 builder settings into configuration
+        var config = components.configuration ?? .default
+        if let modelSettings = components.modelSettings {
+            config.modelSettings = modelSettings
+        }
+        if let parallelToolCalls = components.parallelToolCalls {
+            config.parallelToolCalls = parallelToolCalls
+        }
+        if let previousResponseId = components.previousResponseId {
+            config.previousResponseId = previousResponseId
+        }
+        if let autoPreviousResponseId = components.autoPreviousResponseId {
+            config.autoPreviousResponseId = autoPreviousResponseId
+        }
+
         try self.init(
             tools: components.tools,
             instructions: components.instructions ?? "",
-            configuration: components.configuration ?? .default,
+            configuration: config,
             memory: components.memory,
             inferenceProvider: components.inferenceProvider,
             tracer: components.tracer,

@@ -424,11 +424,15 @@ enum ConduitToolCallConverter {
             throw AgentError.invalidToolArguments(toolName: toolName, reason: "Invalid UTF-8 tool arguments")
         }
 
-        do {
-            let decoded = try JSONDecoder().decode([String: SendableValue].self, from: data)
-            return decoded
-        } catch {
-            throw AgentError.invalidToolArguments(toolName: toolName, reason: "Tool arguments must be a JSON object: \(error)")
+        let jsonObject = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        guard let dict = jsonObject as? [String: Any] else {
+            throw AgentError.invalidToolArguments(toolName: toolName, reason: "Tool arguments must be a JSON object")
         }
+
+        var result: [String: SendableValue] = [:]
+        for (key, value) in dict {
+            result[key] = SendableValue.fromJSONValue(value)
+        }
+        return result
     }
 }
