@@ -73,6 +73,7 @@ public protocol InputGuardrail: Guardrail {
 ///
 /// let result = try await lengthGuardrail.validate("user input", context: nil)
 /// ```
+@available(*, deprecated, message: "Use InputGuard(\"name\") { input in ... } instead. ClosureInputGuardrail is superseded by the V3 API.")
 struct ClosureInputGuardrail: InputGuardrail, Sendable {
     /// The name of this guardrail for identification and logging.
     let name: String
@@ -215,6 +216,7 @@ struct InputGuardrailBuilder: Sendable {
 
 // MARK: - Convenience Factories (Internal — legacy)
 
+@available(*, deprecated, message: "Use InputGuard(\"name\") { input in ... } instead. ClosureInputGuardrail is superseded by the V3 API.")
 extension ClosureInputGuardrail {
     /// Creates a guardrail that checks input length.
     static func maxLength(_ maxLength: Int, name: String = "MaxLengthGuardrail") -> ClosureInputGuardrail {

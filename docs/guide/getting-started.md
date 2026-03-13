@@ -23,6 +23,10 @@ targets: [
 
 ## Your First Agent
 
+### Using `Agent` (struct init)
+
+The primary way to create an agent is with the `Agent` struct initializer:
+
 ```swift
 import Swarm
 
@@ -35,36 +39,174 @@ struct PriceTool {
 }
 
 // 2. Create an agent with tools
-let agent = Agent(
-    name: "Analyst",
+let agent = try Agent(
     tools: [PriceTool()],
-    instructions: "Answer finance questions using real data."
+    instructions: "Answer finance questions using real data.",
+    inferenceProvider: .anthropic(key: "sk-...")
 )
 
 // 3. Run it
-let result = try await agent
-    .environment(\.inferenceProvider, .anthropic(key: "sk-..."))
-    .run("What is AAPL trading at?")
-
+let result = try await agent.run("What is AAPL trading at?")
 print(result.output) // "Apple (AAPL) is currently trading at $182.50."
 ```
 
-## Multi-Agent Workflow
+### Using `AgentV3` (modifier chain)
 
-Compose multi-agent execution with `Workflow`:
+`AgentV3` provides a fluent modifier-chain API for building agents inline:
 
 ```swift
-let result = try await Workflow()
-    .step(fetchAgent)
+import Swarm
+
+let agent = AgentV3("Answer finance questions using real data.") {
+    PriceTool()
+    CalculatorTool()
+}
+.named("Analyst")
+.provider(.anthropic(key: "sk-..."))
+.memory(.conversation(limit: 50))
+.guardrails(.maxInput(5000), .inputNotEmpty)
+
+let result = try await agent.run("What is AAPL trading at?")
+print(result.output) // "Apple (AAPL) is currently trading at $182.50."
+```
+
+The `AgentV3` init takes a system prompt string and a `@ToolBuilder` trailing closure for tools. Modifiers like `.named()`, `.provider()`, `.memory()`, and `.guardrails()` chain immutably -- each returns a new configured agent.
+
+## Creating Tools
+
+### `@Tool` macro (recommended)
+
+Define a struct with `@Tool` and annotate parameters with `@Parameter`:
+
+```swift
+@Tool("Searches the web for information")
+struct WebSearchTool {
+    @Parameter("The search query") var query: String
+    @Parameter("Max results to return") var limit: Int = 5
+
+    func execute() async throws -> String {
+        // Your search implementation
+        "Results for \(query)"
+    }
+}
+```
+
+### `InlineTool` (one-off closures)
+
+For quick inline tools that do not need a full struct:
+
+```swift
+let reverse = InlineTool("reverse", "Reverses a string") { (s: String) in
+    String(s.reversed())
+}
+```
+
+Use `InlineTool` inside a `@ToolBuilder` closure:
+
+```swift
+let agent = AgentV3("You are a helpful text utility.") {
+    InlineTool("reverse", "Reverses a string") { (s: String) in
+        String(s.reversed())
+    }
+    InlineTool("uppercase", "Uppercases a string") { (s: String) in
+        s.uppercased()
+    }
+}
+.provider(.anthropic(key: "sk-..."))
+```
+
+## Running Agents
+
+### Single-turn `run()`
+
+Returns an `AgentResult` with the agent's final output, tool call records, token usage, and duration:
+
+```swift
+let result = try await agent.run("What is 2 + 2?")
+print(result.output)       // "4"
+print(result.duration)     // Duration
+print(result.tokenUsage)   // TokenUsage(inputTokens:, outputTokens:)
+```
+
+### Streaming with `stream()`
+
+Stream `AgentEvent` values in real time -- ideal for live UI:
+
+```swift
+for try await event in agent.stream("Tell me about Swift concurrency.") {
+    switch event {
+    case .outputToken(let token):
+        print(token, terminator: "")
+    case .toolCallStarted(let call):
+        print("\n[tool: \(call.toolName)]")
+    case .completed(let result):
+        print("\nDone in \(result.duration)")
+    default:
+        break
+    }
+}
+```
+
+### Multi-turn `Conversation`
+
+`Conversation` wraps an agent for stateful multi-turn chat:
+
+```swift
+let conversation = Conversation(with: agent)
+
+let first = try await conversation.send("What is Swift?")
+let followUp = try await conversation.send("How does its concurrency model work?")
+
+// Full transcript
+for message in await conversation.messages {
+    print("\(message.role): \(message.text)")
+}
+```
+
+## Multi-Agent Workflows
+
+### Sequential pipeline
+
+Compose multi-agent execution with `WorkflowV3`:
+
+```swift
+let result = try await WorkflowV3()
+    .step(researchAgent)
     .step(analyzeAgent)
     .step(writerAgent)
-    .run("Summarize the WWDC session on Swift concurrency.")
+    .run(input: "Summarize the WWDC session on Swift concurrency.")
 ```
+
+### Parallel fan-out
+
+Run multiple agents in parallel and merge their results:
+
+```swift
+let result = try await WorkflowV3()
+    .parallel([bullAgent, bearAgent, analystAgent], merge: .structured)
+    .run(input: "Evaluate Apple's Q4 earnings.")
+```
+
+### Routing
+
+Route to different agents based on input content:
+
+```swift
+let result = try await WorkflowV3()
+    .route { input in
+        if input.contains("$") { return mathAgent }
+        if input.contains("weather") { return weatherAgent }
+        return generalAgent
+    }
+    .run(input: "What is 15% of $240?")
+```
+
+### Advanced: checkpoint and resume
 
 For checkpoint/resume and other power features, use the namespaced advanced API:
 
 ```swift
-let result = try await Workflow()
+let result = try await WorkflowV3()
     .step(fetchAgent)
     .step(analyzeAgent)
     .advanced
@@ -72,7 +214,7 @@ let result = try await Workflow()
     .advanced
     .checkpointStore(.fileSystem(directory: checkpointsURL))
     .advanced
-    .run("Summarize the WWDC session")
+    .run("Summarize the WWDC session", resumeFrom: nil)
 ```
 
 ## Choosing a Provider
@@ -81,22 +223,22 @@ Swarm supports multiple inference providers. Swap with one line:
 
 ```swift
 // On-device (private, no network)
-.environment(\.inferenceProvider, .foundationModels)
+.provider(.foundationModels)
 
 // Anthropic
-.environment(\.inferenceProvider, .anthropic(key: "sk-..."))
+.provider(.anthropic(key: "sk-..."))
 
 // OpenAI
-.environment(\.inferenceProvider, .openAI(key: "sk-..."))
+.provider(.openAI(key: "sk-..."))
 
 // Ollama (local)
-.environment(\.inferenceProvider, .ollama())
+.provider(.ollama())
+```
 
-// Multiple providers — route by model prefix
-.environment(\.inferenceProvider, MultiProvider(providers: [
-    "anthropic": anthropicProvider,
-    "openai": openAIProvider,
-]))
+Or using the `.environment()` modifier on any `AgentRuntime`:
+
+```swift
+agent.environment(\.inferenceProvider, .anthropic(key: "sk-..."))
 ```
 
 ## Requirements
@@ -114,7 +256,7 @@ Foundation Models require iOS 26 / macOS 26. Cloud providers (Anthropic, OpenAI,
 
 ## Next Steps
 
-- **[Agents](/agents)** — Agent types, configuration, tool calling
-- **[Tools](/tools)** — `@Tool` macro, `FunctionTool`, tool chains
-- **Workflow** — Use `Workflow` for sequential, parallel, and routed execution
-- **[Memory](/memory)** — Conversation, vector, summary, persistent
+- **[Agents](/agents)** -- Agent types, configuration, tool calling
+- **[Tools](/tools)** -- `@Tool` macro, `InlineTool`, tool chains
+- **Workflow** -- Use `WorkflowV3` for sequential, parallel, and routed execution
+- **[Memory](/memory)** -- Conversation, vector, summary, persistent

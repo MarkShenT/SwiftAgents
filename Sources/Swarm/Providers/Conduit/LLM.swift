@@ -13,6 +13,7 @@ public enum LLM: Sendable, InferenceProvider {
     case openAI(OpenAIConfig)
     case anthropic(AnthropicConfig)
     case openRouter(OpenRouterConfig)
+    case ollama(OllamaConfig)
 
     // MARK: - Presets
 
@@ -72,6 +73,9 @@ public enum LLM: Sendable, InferenceProvider {
         case var .openRouter(config):
             update(&config.advanced)
             return .openRouter(config)
+        case .ollama:
+            // Ollama does not use AdvancedOptions — return unchanged.
+            return self
         }
     }
 
@@ -125,6 +129,14 @@ public enum LLM: Sendable, InferenceProvider {
                 model: modelID,
                 baseConfig: config.advanced.baseConfig
             )
+        case let .ollama(config):
+            let configuration = OpenAIConfiguration.ollama(
+                host: config.settings.host,
+                port: config.settings.port
+            )
+            let provider = OpenAIProvider(configuration: configuration)
+            let modelID = OpenAIModelID.ollama(config.model)
+            return ConduitInferenceProvider(provider: provider, model: modelID)
         }
     }
 }
@@ -180,6 +192,15 @@ public extension InferenceProvider where Self == LLM {
 
     static func openRouter(key: String, model: String = "anthropic/claude-3.5-sonnet") -> LLM {
         LLM.openRouter(key: key, model: model)
+    }
+
+    /// Creates an Ollama-backed `LLM` provider for local inference.
+    ///
+    /// - Parameters:
+    ///   - model: The Ollama model name (e.g. `"llama3.2"`, `"mistral"`, `"codellama"`).
+    ///   - settings: Advanced Ollama connection settings. Default: `.default`
+    static func ollama(_ model: String, settings: OllamaSettings = .default) -> LLM {
+        LLM.ollama(LLM.OllamaConfig(model: model, settings: settings))
     }
 }
 
@@ -245,6 +266,19 @@ public extension LLM {
 
         public init(routing: OpenRouterRouting? = nil) {
             self.routing = routing
+        }
+    }
+
+    /// Ollama configuration for local inference.
+    struct OllamaConfig: Sendable {
+        /// The Ollama model name (e.g. `"llama3.2"`, `"mistral"`, `"codellama"`).
+        public var model: String
+        /// Ollama connection and runtime settings.
+        public var settings: OllamaSettings
+
+        public init(model: String, settings: OllamaSettings = .default) {
+            self.model = model
+            self.settings = settings
         }
     }
 }

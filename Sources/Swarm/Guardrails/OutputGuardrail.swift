@@ -108,6 +108,7 @@ public protocol OutputGuardrail: Guardrail {
 ///     return .passed()
 /// }
 /// ```
+@available(*, deprecated, message: "Use OutputGuard(\"name\") { output in ... } instead. ClosureOutputGuardrail is superseded by the V3 API.")
 struct ClosureOutputGuardrail: OutputGuardrail, Sendable {
     /// The name of this guardrail.
     let name: String
@@ -274,6 +275,7 @@ struct OutputGuardrailBuilder: Sendable {
 
 // MARK: - Convenience Factories (Internal — legacy)
 
+@available(*, deprecated, message: "Use OutputGuard(\"name\") { output in ... } instead. ClosureOutputGuardrail is superseded by the V3 API.")
 extension ClosureOutputGuardrail {
     /// Creates a guardrail that checks output length.
     static func maxLength(_ maxLength: Int, name: String = "MaxOutputLengthGuardrail") -> ClosureOutputGuardrail {
