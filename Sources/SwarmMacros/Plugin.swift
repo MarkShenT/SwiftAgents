@@ -15,6 +15,7 @@ struct SwarmMacrosPlugin: CompilerPlugin {
         AgentMacro.self,
         TraceableMacro.self,
         PromptMacro.self,
-        BuilderMacro.self
+        BuilderMacro.self,
+        AgentV3Macro.self
     ]
 }

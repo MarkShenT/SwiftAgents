@@ -19,10 +19,10 @@ public enum WorkflowError: Error, Sendable, Equatable {
 
     // MARK: - Handoff Errors
 
-    /// Agent handoff failed between source and target agents.
+    /// LegacyAgent handoff failed between source and target agents.
     case handoffFailed(source: String, target: String, reason: String)
 
-    /// Agent handoff was skipped because it was disabled.
+    /// LegacyAgent handoff was skipped because it was disabled.
     case handoffSkipped(from: String, to: String, reason: String)
 
     // MARK: - Routing Errors
@@ -77,7 +77,7 @@ extension WorkflowError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case let .agentNotFound(name):
-            return "Agent not found: \(name)"
+            return "LegacyAgent not found: \(name)"
         case .noAgentsConfigured:
             return "No agents configured in workflow coordinator"
         case let .handoffFailed(source, target, reason):
