@@ -468,19 +468,19 @@ public protocol MetricsReporter: Sendable {
 ///
 /// await reporter.report(snapshot)
 /// ```
-public struct JSONMetricsReporter: MetricsReporter {
+package struct JSONMetricsReporter: MetricsReporter {
     /// Optional file path to write JSON output.
-    public let outputPath: String?
+    package let outputPath: String?
 
     /// Whether to format JSON with indentation.
-    public let prettyPrint: Bool
+    package let prettyPrint: Bool
 
     /// Creates a JSON metrics reporter.
     ///
     /// - Parameters:
     ///   - outputPath: Optional file path to write JSON. If nil, returns data.
     ///   - prettyPrint: Whether to format JSON with indentation. Default: `true`.
-    public init(outputPath: String? = nil, prettyPrint: Bool = true) {
+    package init(outputPath: String? = nil, prettyPrint: Bool = true) {
         self.outputPath = outputPath
         self.prettyPrint = prettyPrint
     }
@@ -489,7 +489,7 @@ public struct JSONMetricsReporter: MetricsReporter {
     ///
     /// - Parameter snapshot: The metrics snapshot to report.
     /// - Throws: Encoding errors or file write errors.
-    public func report(_ snapshot: MetricsSnapshot) async throws {
+    package func report(_ snapshot: MetricsSnapshot) async throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
 
@@ -522,7 +522,7 @@ public struct JSONMetricsReporter: MetricsReporter {
     /// - Parameter snapshot: The metrics snapshot to serialize.
     /// - Returns: JSON data.
     /// - Throws: Encoding errors.
-    public func jsonData(from snapshot: MetricsSnapshot) throws -> Data {
+    package func jsonData(from snapshot: MetricsSnapshot) throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
 
@@ -540,7 +540,7 @@ public struct JSONMetricsReporter: MetricsReporter {
     /// - Parameter snapshot: The metrics snapshot to serialize.
     /// - Returns: JSON string.
     /// - Throws: Encoding errors.
-    public func jsonString(from snapshot: MetricsSnapshot) throws -> String {
+    package func jsonString(from snapshot: MetricsSnapshot) throws -> String {
         let data = try jsonData(from: snapshot)
         guard let string = String(data: data, encoding: .utf8) else {
             throw MetricsReporterError.encodingFailed

@@ -65,7 +65,7 @@ struct MyApp {
                 tools: [searchTool, StringTool(), DateTimeTool()],
                 instructions: "You are a deep research Agent. When you don't find something you keep looking.",
                 inferenceProvider: inferenceProvider,
-                tracer: PrettyConsoleTracer()
+                tracer: ConsoleTracer()
             )
         } catch {
             fatalError("Failed to create agent: \(error)")

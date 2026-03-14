@@ -243,7 +243,7 @@ public extension AgentObserver {
 ///     observers: [composite]
 /// )
 /// ```
-public struct CompositeObserver: AgentObserver {
+package struct CompositeObserver: AgentObserver {
     // MARK: Public
 
     // MARK: - Initialization
@@ -251,13 +251,13 @@ public struct CompositeObserver: AgentObserver {
     /// Creates a composite hook that delegates to multiple observer.
     ///
     /// - Parameter observer: The observer to delegate to.
-    public init(observers: [any AgentObserver]) {
+    package init(observers: [any AgentObserver]) {
         self.observers = observers
     }
 
     // MARK: - AgentObserver Implementation
 
-    public func onAgentStart(context: AgentContext?, agent: any AgentRuntime, input: String) async {
+    package func onAgentStart(context: AgentContext?, agent: any AgentRuntime, input: String) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -267,7 +267,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onAgentEnd(context: AgentContext?, agent: any AgentRuntime, result: AgentResult) async {
+    package func onAgentEnd(context: AgentContext?, agent: any AgentRuntime, result: AgentResult) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -277,7 +277,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onError(context: AgentContext?, agent: any AgentRuntime, error: Error) async {
+    package func onError(context: AgentContext?, agent: any AgentRuntime, error: Error) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -287,7 +287,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onHandoff(context: AgentContext?, fromAgent: any AgentRuntime, toAgent: any AgentRuntime) async {
+    package func onHandoff(context: AgentContext?, fromAgent: any AgentRuntime, toAgent: any AgentRuntime) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -297,7 +297,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onToolStart(context: AgentContext?, agent: any AgentRuntime, call: ToolCall) async {
+    package func onToolStart(context: AgentContext?, agent: any AgentRuntime, call: ToolCall) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -307,7 +307,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onToolCallPartial(context: AgentContext?, agent: any AgentRuntime, update: PartialToolCallUpdate) async {
+    package func onToolCallPartial(context: AgentContext?, agent: any AgentRuntime, update: PartialToolCallUpdate) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -317,7 +317,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onToolEnd(context: AgentContext?, agent: any AgentRuntime, result: ToolResult) async {
+    package func onToolEnd(context: AgentContext?, agent: any AgentRuntime, result: ToolResult) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -327,7 +327,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onLLMStart(context: AgentContext?, agent: any AgentRuntime, systemPrompt: String?, inputMessages: [MemoryMessage]) async {
+    package func onLLMStart(context: AgentContext?, agent: any AgentRuntime, systemPrompt: String?, inputMessages: [MemoryMessage]) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -337,7 +337,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onLLMEnd(context: AgentContext?, agent: any AgentRuntime, response: String, usage: TokenUsage?) async {
+    package func onLLMEnd(context: AgentContext?, agent: any AgentRuntime, response: String, usage: TokenUsage?) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -347,7 +347,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onGuardrailTriggered(context: AgentContext?, guardrailName: String, guardrailType: GuardrailType, result: GuardrailResult) async {
+    package func onGuardrailTriggered(context: AgentContext?, guardrailName: String, guardrailType: GuardrailType, result: GuardrailResult) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -357,7 +357,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onThinking(context: AgentContext?, agent: any AgentRuntime, thought: String) async {
+    package func onThinking(context: AgentContext?, agent: any AgentRuntime, thought: String) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -367,7 +367,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onThinkingPartial(context: AgentContext?, agent: any AgentRuntime, partialThought: String) async {
+    package func onThinkingPartial(context: AgentContext?, agent: any AgentRuntime, partialThought: String) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -377,7 +377,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onOutputToken(context: AgentContext?, agent: any AgentRuntime, token: String) async {
+    package func onOutputToken(context: AgentContext?, agent: any AgentRuntime, token: String) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -387,7 +387,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onIterationStart(context: AgentContext?, agent: any AgentRuntime, number: Int) async {
+    package func onIterationStart(context: AgentContext?, agent: any AgentRuntime, number: Int) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {
@@ -397,7 +397,7 @@ public struct CompositeObserver: AgentObserver {
         }
     }
 
-    public func onIterationEnd(context: AgentContext?, agent: any AgentRuntime, number: Int) async {
+    package func onIterationEnd(context: AgentContext?, agent: any AgentRuntime, number: Int) async {
         await withTaskGroup(of: Void.self) { group in
             for hook in observers {
                 group.addTask {

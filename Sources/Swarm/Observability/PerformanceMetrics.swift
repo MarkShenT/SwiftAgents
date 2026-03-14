@@ -199,15 +199,15 @@ public struct PerformanceMetrics: Sendable, Equatable {
 /// await tracker.start()
 /// // ... track new execution ...
 /// ```
-public actor PerformanceTracker {
-    // MARK: Public
+package actor PerformanceTracker {
+    // MARK: Package
 
     // MARK: - Initialization
 
     /// Creates a new performance tracker.
     ///
     /// The tracker starts in an idle state. Call ``start()`` to begin tracking.
-    public init() {}
+    package init() {}
 
     // MARK: - Tracking Methods
 
@@ -223,7 +223,7 @@ public actor PerformanceTracker {
     /// // ... perform operations ...
     /// let metrics = await tracker.finish()
     /// ```
-    public func start() {
+    package func start() {
         startTime = ContinuousClock.now
     }
 
@@ -239,7 +239,7 @@ public actor PerformanceTracker {
     /// let response = try await llm.generate(prompt)
     /// await tracker.recordLLMCall(duration: ContinuousClock.now - start)
     /// ```
-    public func recordLLMCall(duration: Duration) {
+    package func recordLLMCall(duration: Duration) {
         llmTime += duration
     }
 
@@ -262,7 +262,7 @@ public actor PerformanceTracker {
     /// // Parallel batch of 5 tools
     /// await tracker.recordToolExecution(duration: parallelBatchDuration, wasParallel: true, count: 5)
     /// ```
-    public func recordToolExecution(duration: Duration, wasParallel: Bool, count: Int = 1) {
+    package func recordToolExecution(duration: Duration, wasParallel: Bool, count: Int = 1) {
         toolTime += duration
         toolCount += count
         usedParallel = usedParallel || wasParallel
@@ -281,7 +281,7 @@ public actor PerformanceTracker {
     /// let sequentialTime = results.reduce(.zero) { $0 + $1.duration }
     /// await tracker.recordSequentialEstimate(sequentialTime)
     /// ```
-    public func recordSequentialEstimate(_ duration: Duration) {
+    package func recordSequentialEstimate(_ duration: Duration) {
         sequentialEstimate = duration
     }
 
@@ -299,7 +299,7 @@ public actor PerformanceTracker {
     /// print("Total: \(metrics.totalDuration)")
     /// print("Tools: \(metrics.toolCount)")
     /// ```
-    public func finish() -> PerformanceMetrics {
+    package func finish() -> PerformanceMetrics {
         let total: Duration = if let start = startTime {
             ContinuousClock.now - start
         } else {
@@ -326,7 +326,7 @@ public actor PerformanceTracker {
     /// await tracker.start()
     /// // ... track new execution ...
     /// ```
-    public func reset() {
+    package func reset() {
         startTime = nil
         llmTime = .zero
         toolTime = .zero

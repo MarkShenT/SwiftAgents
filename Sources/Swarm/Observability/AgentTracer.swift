@@ -98,8 +98,8 @@ public extension Tracer {
 ///
 /// await tracer.trace(event) // Forwards to all three tracers in parallel
 /// ```
-public actor CompositeTracer: Tracer {
-    // MARK: Public
+package actor CompositeTracer: Tracer {
+    // MARK: Package
 
     /// Creates a composite tracer.
     ///
@@ -107,7 +107,7 @@ public actor CompositeTracer: Tracer {
     ///   - tracers: The child tracers to forward events to.
     ///   - minimumLevel: Minimum event level to forward. Default: `.trace` (all events).
     ///   - shouldExecuteInParallel: Whether to forward events in parallel. Default: `true`.
-    public init(
+    package init(
         tracers: [any Tracer],
         minimumLevel: EventLevel = .trace,
         shouldExecuteInParallel: Bool = true
@@ -123,11 +123,11 @@ public actor CompositeTracer: Tracer {
     ///   - tracers: The child tracers to forward events to.
     ///   - parallel: Whether to forward events in parallel.
     @available(*, deprecated, message: "Use shouldExecuteInParallel instead of parallel")
-    public init(tracers: [any Tracer], parallel: Bool) {
+    package init(tracers: [any Tracer], parallel: Bool) {
         self.init(tracers: tracers, minimumLevel: .trace, shouldExecuteInParallel: parallel)
     }
 
-    public func trace(_ event: TraceEvent) async {
+    package func trace(_ event: TraceEvent) async {
         // Filter events below minimum level
         guard event.level >= minimumLevel else { return }
 
@@ -148,7 +148,7 @@ public actor CompositeTracer: Tracer {
         }
     }
 
-    public func flush() async {
+    package func flush() async {
         if shouldExecuteInParallel {
             // Flush all tracers in parallel
             await withTaskGroup(of: Void.self) { group in
@@ -193,17 +193,17 @@ public actor CompositeTracer: Tracer {
 /// let tracer: Tracer = NoOpTracer()
 /// await tracer.trace(event) // Event is discarded
 /// ```
-public actor NoOpTracer: Tracer {
+package actor NoOpTracer: Tracer {
     /// Creates a no-op tracer.
-    public init() {}
+    package init() {}
 
     /// Discards the event without processing.
-    public func trace(_: TraceEvent) async {
+    package func trace(_: TraceEvent) async {
         // Intentionally empty - discard all events
     }
 
     /// No-op flush implementation.
-    public func flush() async {
+    package func flush() async {
         // Intentionally empty
     }
 }
@@ -240,8 +240,8 @@ public actor NoOpTracer: Tracer {
 /// // Manually flush if needed
 /// await buffered.flush()
 /// ```
-public actor BufferedTracer: Tracer {
-    // MARK: Public
+package actor BufferedTracer: Tracer {
+    // MARK: Package
 
     /// Creates a buffered tracer.
     ///
@@ -249,7 +249,7 @@ public actor BufferedTracer: Tracer {
     ///   - destination: The tracer to forward buffered events to.
     ///   - maxBufferSize: Maximum events to buffer before auto-flush. Default: `100`.
     ///   - flushInterval: Time between automatic flushes. Default: `5 seconds`.
-    public init(
+    package init(
         destination: any Tracer,
         maxBufferSize: Int = 100,
         flushInterval: Duration = .seconds(5)
@@ -262,7 +262,7 @@ public actor BufferedTracer: Tracer {
     }
 
     /// Starts the periodic flush task. Call this after initialization.
-    public func start() {
+    package func start() {
         guard flushTask == nil else { return }
         // Note: Actors don't need [weak self] - the Task is cancelled in deinit
         // and actor isolation guarantees safe access
@@ -271,7 +271,7 @@ public actor BufferedTracer: Tracer {
         }
     }
 
-    public func trace(_ event: TraceEvent) async {
+    package func trace(_ event: TraceEvent) async {
         buffer.append(event)
 
         // Auto-flush if buffer is full
@@ -280,7 +280,7 @@ public actor BufferedTracer: Tracer {
         }
     }
 
-    public func flush() async {
+    package func flush() async {
         guard !buffer.isEmpty else { return }
 
         // Copy buffer and clear it

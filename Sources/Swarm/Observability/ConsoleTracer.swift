@@ -273,8 +273,8 @@ public actor ConsoleTracer: Tracer {
 ///     results_count: 42
 ///     search_time: 1.2
 /// ```
-public actor PrettyConsoleTracer: Tracer {
-    // MARK: Public
+package actor PrettyConsoleTracer: Tracer {
+    // MARK: Package
 
     /// Creates a pretty console tracer with the specified configuration.
     ///
@@ -283,7 +283,7 @@ public actor PrettyConsoleTracer: Tracer {
     ///   - colorized: Whether to use ANSI color codes. Default: `true`.
     ///   - includeTimestamp: Whether to include timestamps. Default: `true`.
     ///   - includeSource: Whether to include source location. Default: `false`.
-    public init(
+    package init(
         minimumLevel: EventLevel = .trace,
         colorized: Bool = true,
         includeTimestamp: Bool = true,
@@ -299,7 +299,7 @@ public actor PrettyConsoleTracer: Tracer {
         dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     }
 
-    public func trace(_ event: TraceEvent) async {
+    package func trace(_ event: TraceEvent) async {
         // Filter events below minimum level
         guard event.level >= minimumLevel else { return }
 

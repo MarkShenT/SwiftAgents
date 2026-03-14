@@ -18,19 +18,19 @@ import Foundation
 /// let result2 = try await callable(topic: "weather", location: "NYC")
 /// ```
 @dynamicCallable
-public struct CallableAgent: Sendable {
+package struct CallableAgent: Sendable {
     private let agent: any AgentRuntime
 
     /// Creates a callable wrapper around an agent.
     /// - Parameter agent: The agent to wrap.
-    public init(_ agent: any AgentRuntime) {
+    package init(_ agent: any AgentRuntime) {
         self.agent = agent
     }
 
     /// Calls the agent with positional string arguments joined by spaces.
     /// - Parameter args: Positional arguments to join as input.
     /// - Returns: The agent's execution result.
-    public func dynamicallyCall(withArguments args: [String]) async throws -> AgentResult {
+    package func dynamicallyCall(withArguments args: [String]) async throws -> AgentResult {
         let input = args.joined(separator: " ")
         return try await agent.run(input, session: nil, observer: nil)
     }
@@ -38,7 +38,7 @@ public struct CallableAgent: Sendable {
     /// Calls the agent with keyword arguments formatted as "key: value" lines.
     /// - Parameter args: Keyword arguments to format as input.
     /// - Returns: The agent's execution result.
-    public func dynamicallyCall(
+    package func dynamicallyCall(
         withKeywordArguments args: KeyValuePairs<String, String>
     ) async throws -> AgentResult {
         let input = args.map { "\($0.key): \($0.value)" }.joined(separator: "\n")

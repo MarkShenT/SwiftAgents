@@ -5,7 +5,7 @@
 
 import Foundation
 
-public extension AgentConfiguration {
+package extension AgentConfiguration {
     /// Resolves the context profile used at runtime after applying context mode.
     var effectiveContextProfile: ContextProfile {
         switch contextMode {
