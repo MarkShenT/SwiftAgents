@@ -5,16 +5,6 @@
 
 import Foundation
 
-// MARK: - Type Aliases for Compatibility
-
-/// Type alias for tool call information.
-/// Provides compatibility with various API naming conventions.
-public typealias ToolCallInfo = ToolCall
-
-/// Type alias for tool result information.
-/// Provides compatibility with various API naming conventions.
-public typealias ToolResultInfo = ToolResult
-
 // MARK: - AgentEvent Stream Operations
 
 public extension AsyncThrowingStream where Element == AgentEvent, Failure == Error {

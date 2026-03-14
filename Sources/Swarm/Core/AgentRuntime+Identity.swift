@@ -24,7 +24,7 @@ import Foundation
 ///
 /// - Note: `runtimeIdentity` is consumed internally by `areSameRuntime`. The
 ///   `AgentRuntimeIdentity` type used for matching is not part of the public API.
-public protocol AgentRuntimeIdentifiable: Sendable {
+package protocol AgentRuntimeIdentifiable: Sendable {
     /// A stable string identifier used to disambiguate runtime instances.
     ///
     /// Must be stable across calls for the lifetime of the agent instance.
