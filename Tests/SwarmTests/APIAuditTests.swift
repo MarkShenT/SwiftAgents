@@ -194,19 +194,19 @@ final class APIAuditTests: XCTestCase {
 
     func testAgentNameConvenienceInit() async throws {
         let agent = try Agent(name: "TestAgent", instructions: "You are helpful.")
-        let name = await agent.configuration.name
+        let name = agent.configuration.name
         XCTAssertEqual(name, "TestAgent")
     }
 
     func testAgentNameConvenienceInitPreservesInstructions() async throws {
         let agent = try Agent(name: "Helper", instructions: "Be concise.")
-        let instructions = await agent.instructions
+        let instructions = agent.instructions
         XCTAssertEqual(instructions, "Be concise.")
     }
 
     func testAgentNameAccessedViaRuntimeProperty() async throws {
         let agent = try Agent(name: "RuntimeName", instructions: "test")
-        let name = await agent.name
+        let name = agent.name
         XCTAssertEqual(name, "RuntimeName")
     }
 
@@ -222,7 +222,7 @@ final class APIAuditTests: XCTestCase {
             handoffAgents: [billing, support]
         )
 
-        let handoffs = await triage.handoffs
+        let handoffs = triage.handoffs
         XCTAssertEqual(handoffs.count, 2)
     }
 
@@ -234,7 +234,7 @@ final class APIAuditTests: XCTestCase {
             handoffAgents: [billing]
         )
 
-        let handoffs = await triage.handoffs
+        let handoffs = triage.handoffs
         XCTAssertEqual(handoffs.count, 1)
         XCTAssertEqual(handoffs.first?.targetAgent.name, "Billing")
     }
@@ -249,7 +249,7 @@ final class APIAuditTests: XCTestCase {
             .handoff(to: billing)
             .build()
 
-        let handoffs = await triage.handoffs
+        let handoffs = triage.handoffs
         XCTAssertEqual(handoffs.count, 1)
         XCTAssertEqual(handoffs.first?.targetAgent.name, "Billing")
     }
@@ -264,7 +264,7 @@ final class APIAuditTests: XCTestCase {
             .handoffs(billing, support, sales)
             .build()
 
-        let handoffs = await triage.handoffs
+        let handoffs = triage.handoffs
         XCTAssertEqual(handoffs.count, 3)
         XCTAssertEqual(handoffs[0].targetAgent.name, "Billing")
         XCTAssertEqual(handoffs[1].targetAgent.name, "Support")
@@ -285,7 +285,7 @@ final class APIAuditTests: XCTestCase {
             }
             .build()
 
-        let handoffs = await triage.handoffs
+        let handoffs = triage.handoffs
         XCTAssertEqual(handoffs.count, 1)
         XCTAssertEqual(handoffs[0].toolNameOverride, "transfer_to_billing")
         XCTAssertEqual(handoffs[0].toolDescription, "Transfer billing/refund issues")
@@ -380,7 +380,7 @@ final class APIAuditTests: XCTestCase {
             inferenceProvider: MockInferenceProvider()
         )
 
-        let name = await agent.name
+        let name = agent.name
         XCTAssertEqual(name, "ConfiguredName")
     }
 
@@ -390,7 +390,7 @@ final class APIAuditTests: XCTestCase {
             inferenceProvider: MockInferenceProvider()
         )
         // Default configuration name is "Agent"
-        let name = await agent.name
+        let name = agent.name
         XCTAssertEqual(name, "Agent")
     }
 

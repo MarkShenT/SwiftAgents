@@ -18,7 +18,7 @@ struct AgentReliabilityTests {
         }
 
         try await Task.sleep(for: .milliseconds(50))
-        await agent.cancel()
+        runTask.cancel()
 
         let completion = await awaitTaskResult(runTask, timeout: .milliseconds(500))
         guard let completion else {
@@ -51,7 +51,7 @@ struct AgentReliabilityTests {
         }
 
         try await Task.sleep(for: .milliseconds(50))
-        await agent.cancel()
+        runTask.cancel()
 
         let completion = await awaitTaskResult(runTask, timeout: .milliseconds(500))
         guard let completion else {

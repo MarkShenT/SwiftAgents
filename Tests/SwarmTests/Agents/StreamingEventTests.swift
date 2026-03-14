@@ -60,11 +60,11 @@ struct StreamingEventTests {
         // .iterationCompleted(2)
         // .completed
 
-        #expect(events.contains { if case .started = $0 { return true }; return false })
-        #expect(events.contains { if case .iterationStarted(let n) = $0 { return n == 1 }; return false })
-        #expect(events.contains { if case .toolCallStarted(let call) = $0 { return call.toolName == "test_tool" }; return false })
-        #expect(events.contains { if case .toolCallCompleted(let call, _) = $0 { return call.toolName == "test_tool" }; return false })
-        #expect(events.contains { if case .completed = $0 { return true }; return false })
+        #expect(events.contains { if case .lifecycle(.started) = $0 { return true }; return false })
+        #expect(events.contains { if case .lifecycle(.iterationStarted(let n)) = $0 { return n == 1 }; return false })
+        #expect(events.contains { if case .tool(.started(call: let call)) = $0 { return call.toolName == "test_tool" }; return false })
+        #expect(events.contains { if case .tool(.completed(call: let call, result: _)) = $0 { return call.toolName == "test_tool" }; return false })
+        #expect(events.contains { if case .lifecycle(.completed) = $0 { return true }; return false })
     }
     
     @Test("Agent stream emits iteration events")
@@ -87,9 +87,9 @@ struct StreamingEventTests {
         }
         
         // 4. Verify events
-        #expect(events.contains { if case .started = $0 { return true }; return false })
-        #expect(events.contains { if case .iterationStarted(let n) = $0 { return n == 1 }; return false })
-        #expect(events.contains { if case .completed = $0 { return true }; return false })
+        #expect(events.contains { if case .lifecycle(.started) = $0 { return true }; return false })
+        #expect(events.contains { if case .lifecycle(.iterationStarted(let n)) = $0 { return n == 1 }; return false })
+        #expect(events.contains { if case .lifecycle(.completed) = $0 { return true }; return false })
     }
 
     @Test("Agent streaming avoids second request without tool-call streaming")

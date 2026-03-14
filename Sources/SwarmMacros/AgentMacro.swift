@@ -1,7 +1,7 @@
 // AgentMacro.swift
 // SwarmMacros
 //
-// Implementation of the @AgentActor macro for generating Agent protocol conformance.
+// Implementation of the @AgentActor macro for generating LegacyAgent protocol conformance.
 
 import SwiftSyntax
 import SwiftSyntaxBuilder
@@ -9,7 +9,7 @@ import SwiftSyntaxMacros
 
 // MARK: - AgentMacro
 
-/// The `@AgentActor` macro generates Agent protocol conformance for an actor.
+/// The `@AgentActor` macro generates LegacyAgent protocol conformance for an actor.
 ///
 /// Usage:
 /// ```swift
@@ -25,7 +25,7 @@ import SwiftSyntaxMacros
 /// ```
 ///
 /// Generates:
-/// - All Agent protocol properties with defaults
+/// - All LegacyAgent protocol properties with defaults
 /// - Standard initializer
 /// - `run()` implementation
 /// - `stream()` wrapper
@@ -251,19 +251,19 @@ public struct AgentMacro: MemberMacro, ExtensionMacro {
                 ) -> AsyncThrowingStream<AgentEvent, Error> {
                     StreamHelper.makeTrackedStream(for: self) { agent, continuation in
                         do {
-                            continuation.yield(.started(input: input))
+                            continuation.yield(.lifecycle(.started(input: input)))
                             let result = try await agent.run(input, session: session, observer: observer)
-                            continuation.yield(.completed(result: result))
+                            continuation.yield(.lifecycle(.completed(result: result)))
                             continuation.finish()
                         } catch let error as AgentError {
-                            continuation.yield(.failed(error: error))
+                            continuation.yield(.lifecycle(.failed(error: error)))
                             continuation.finish(throwing: error)
                         } catch let error as GuardrailError {
-                            continuation.yield(.guardrailFailed(error: error))
+                            continuation.yield(.lifecycle(.guardrailFailed(error: error)))
                             continuation.finish(throwing: error)
                         } catch {
                             let agentError = AgentError.internalError(reason: error.localizedDescription)
-                            continuation.yield(.failed(error: agentError))
+                            continuation.yield(.lifecycle(.failed(error: agentError)))
                             continuation.finish(throwing: agentError)
                         }
                     }
@@ -287,7 +287,7 @@ public struct AgentMacro: MemberMacro, ExtensionMacro {
             if let actorDecl = declaration.as(ActorDeclSyntax.self) {
                 typeName = actorDecl.name.text
             } else {
-                typeName = "Agent"
+                typeName = "LegacyAgent"
             }
             members.append(generateBuilderClass(typeName: typeName, defaultInstructions: instructions))
         }

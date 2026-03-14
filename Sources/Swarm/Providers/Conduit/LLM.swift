@@ -5,14 +5,25 @@ import Foundation
 ///
 /// Use with any API that accepts an `InferenceProvider`:
 /// ```swift
-/// let agent = Agent(.openAI(key: "..."))
+/// let agent = Agent("...", provider: .openAI(key: "..."))
 /// ```
 ///
-/// Advanced customization is intentionally hidden behind `.advanced { ... }`.
-public enum LLM: Sendable, InferenceProvider {
-    case openAI(OpenAIConfig)
-    case anthropic(AnthropicConfig)
-    case openRouter(OpenRouterConfig)
+/// Advanced customization is available via `.ollama("model") { $0.port = 11435 }`.
+public struct LLM: Sendable, InferenceProvider {
+    // MARK: - Private Storage
+
+    private let kind: Kind
+
+    private enum Kind: Sendable {
+        case openAI(OpenAIConfig)
+        case anthropic(AnthropicConfig)
+        case openRouter(OpenRouterConfig)
+        case ollama(OllamaConfig)
+    }
+
+    private init(kind: Kind) {
+        self.kind = kind
+    }
 
     // MARK: - Presets
 
@@ -20,7 +31,7 @@ public enum LLM: Sendable, InferenceProvider {
         apiKey: String,
         model: String = "gpt-4o-mini"
     ) -> LLM {
-        .openAI(OpenAIConfig(apiKey: apiKey, model: model))
+        LLM(kind: .openAI(OpenAIConfig(apiKey: apiKey, model: model)))
     }
 
     public static func openAI(
@@ -32,14 +43,14 @@ public enum LLM: Sendable, InferenceProvider {
 
     public static func anthropic(
         apiKey: String,
-        model: String = AnthropicModelID.claude35Sonnet.rawValue
+        model: String = "claude-3-5-sonnet-20241022"
     ) -> LLM {
-        .anthropic(AnthropicConfig(apiKey: apiKey, model: model))
+        LLM(kind: .anthropic(AnthropicConfig(apiKey: apiKey, model: model)))
     }
 
     public static func anthropic(
         key: String,
-        model: String = AnthropicModelID.claude35Sonnet.rawValue
+        model: String = "claude-3-5-sonnet-20241022"
     ) -> LLM {
         anthropic(apiKey: key, model: model)
     }
@@ -48,7 +59,7 @@ public enum LLM: Sendable, InferenceProvider {
         apiKey: String,
         model: String = "anthropic/claude-3.5-sonnet"
     ) -> LLM {
-        .openRouter(OpenRouterConfig(apiKey: apiKey, model: model))
+        LLM(kind: .openRouter(OpenRouterConfig(apiKey: apiKey, model: model)))
     }
 
     public static func openRouter(
@@ -58,21 +69,53 @@ public enum LLM: Sendable, InferenceProvider {
         openRouter(apiKey: key, model: model)
     }
 
-    // MARK: - Progressive Disclosure
+    /// Creates an Ollama-backed `LLM` provider for local inference.
+    ///
+    /// - Parameters:
+    ///   - model: The Ollama model name (e.g. `"llama3.2"`, `"mistral"`, `"codellama"`).
+    ///   - configure: Optional closure to customize Ollama connection settings.
+    ///
+    /// ```swift
+    /// // Simple usage
+    /// let llm = LLM.ollama("mistral")
+    ///
+    /// // With configuration
+    /// let llm = LLM.ollama("mistral") { settings in
+    ///     settings.host = "127.0.0.1"
+    ///     settings.port = 11435
+    /// }
+    /// ```
+    public static func ollama(
+        _ model: String,
+        configure: ((inout OllamaSettings) -> Void)? = nil
+    ) -> LLM {
+        var settings = OllamaSettings.default
+        configure?(&settings)
+        return LLM(kind: .ollama(OllamaConfig(model: model, settings: settings)))
+    }
 
-    /// Applies advanced configuration for experts.
-    public func advanced(_ update: (inout AdvancedOptions) -> Void) -> LLM {
-        switch self {
-        case var .openAI(config):
-            update(&config.advanced)
-            return .openAI(config)
-        case var .anthropic(config):
-            update(&config.advanced)
-            return .anthropic(config)
-        case var .openRouter(config):
-            update(&config.advanced)
-            return .openRouter(config)
-        }
+    /// Creates an OpenRouter-backed `LLM` provider with routing configuration.
+    ///
+    /// - Parameters:
+    ///   - apiKey: Your OpenRouter API key.
+    ///   - model: The model identifier (e.g. `"anthropic/claude-3.5-sonnet"`).
+    ///   - configure: Closure to customize OpenRouter routing preferences.
+    ///
+    /// ```swift
+    /// let llm = LLM.openRouter(apiKey: key, model: "anthropic/claude-3.5-sonnet") { routing in
+    ///     routing.providers = [.anthropic]
+    /// }
+    /// ```
+    public static func openRouter(
+        apiKey: String,
+        model: String = "anthropic/claude-3.5-sonnet",
+        configure: (inout OpenRouterRouting) -> Void
+    ) -> LLM {
+        var routing = OpenRouterRouting()
+        configure(&routing)
+        var config = OpenRouterConfig(apiKey: apiKey, model: model)
+        config.advanced.openRouter.routing = routing
+        return LLM(kind: .openRouter(config))
     }
 
     // MARK: - InferenceProvider
@@ -96,7 +139,7 @@ public enum LLM: Sendable, InferenceProvider {
     // MARK: - Internals
 
     private func makeProvider() -> any InferenceProvider {
-        switch self {
+        switch kind {
         case let .openAI(config):
             let provider = OpenAIProvider(configuration: .openAI(apiKey: config.apiKey))
             let modelID = OpenAIModelID(config.model)
@@ -125,6 +168,14 @@ public enum LLM: Sendable, InferenceProvider {
                 model: modelID,
                 baseConfig: config.advanced.baseConfig
             )
+        case let .ollama(config):
+            let configuration = OpenAIConfiguration.ollama(
+                host: config.settings.host,
+                port: config.settings.port
+            )
+            let provider = OpenAIProvider(configuration: configuration)
+            let modelID = OpenAIModelID.ollama(config.model)
+            return ConduitInferenceProvider(provider: provider, model: modelID)
         }
     }
 }
@@ -166,11 +217,11 @@ public extension InferenceProvider where Self == LLM {
         LLM.openAI(key: key, model: model)
     }
 
-    static func anthropic(apiKey: String, model: String = AnthropicModelID.claude35Sonnet.rawValue) -> LLM {
+    static func anthropic(apiKey: String, model: String = "claude-3-5-sonnet-20241022") -> LLM {
         LLM.anthropic(apiKey: apiKey, model: model)
     }
 
-    static func anthropic(key: String, model: String = AnthropicModelID.claude35Sonnet.rawValue) -> LLM {
+    static func anthropic(key: String, model: String = "claude-3-5-sonnet-20241022") -> LLM {
         LLM.anthropic(key: key, model: model)
     }
 
@@ -181,53 +232,96 @@ public extension InferenceProvider where Self == LLM {
     static func openRouter(key: String, model: String = "anthropic/claude-3.5-sonnet") -> LLM {
         LLM.openRouter(key: key, model: model)
     }
+
+    /// Creates an Ollama-backed `LLM` provider for local inference.
+    ///
+    /// - Parameters:
+    ///   - model: The Ollama model name (e.g. `"llama3.2"`, `"mistral"`, `"codellama"`).
+    ///   - configure: Optional closure to customize Ollama connection settings.
+    ///
+    /// ```swift
+    /// // Simple usage
+    /// let llm: some InferenceProvider = .ollama("mistral")
+    ///
+    /// // With configuration
+    /// let llm: some InferenceProvider = .ollama("mistral") { settings in
+    ///     settings.host = "127.0.0.1"
+    ///     settings.port = 11435
+    /// }
+    /// ```
+    static func ollama(
+        _ model: String,
+        configure: ((inout OllamaSettings) -> Void)? = nil
+    ) -> LLM {
+        LLM.ollama(model, configure: configure)
+    }
+
+    /// Creates an OpenRouter-backed `LLM` provider with routing configuration.
+    ///
+    /// - Parameters:
+    ///   - apiKey: Your OpenRouter API key.
+    ///   - model: The model identifier (e.g. `"anthropic/claude-3.5-sonnet"`).
+    ///   - configure: Closure to customize OpenRouter routing preferences.
+    ///
+    /// ```swift
+    /// let llm: some InferenceProvider = .openRouter(apiKey: key, model: "anthropic/claude-3.5-sonnet") { routing in
+    ///     routing.providers = [.anthropic]
+    /// }
+    /// ```
+    static func openRouter(
+        apiKey: String,
+        model: String = "anthropic/claude-3.5-sonnet",
+        configure: (inout OpenRouterRouting) -> Void
+    ) -> LLM {
+        LLM.openRouter(apiKey: apiKey, model: model, configure: configure)
+    }
 }
 
-// MARK: - Configuration Types
+// MARK: - Configuration Types (Internal)
 
-public extension LLM {
+extension LLM {
     struct OpenAIConfig: Sendable {
-        public var apiKey: String
-        public var model: String
-        public var advanced: AdvancedOptions = .default
+        var apiKey: String
+        var model: String
+        var advanced: AdvancedOptions = .default
 
-        public init(apiKey: String, model: String) {
+        init(apiKey: String, model: String) {
             self.apiKey = apiKey
             self.model = model
         }
     }
 
     struct AnthropicConfig: Sendable {
-        public var apiKey: String
-        public var model: String
-        public var advanced: AdvancedOptions = .default
+        var apiKey: String
+        var model: String
+        var advanced: AdvancedOptions = .default
 
-        public init(apiKey: String, model: String) {
+        init(apiKey: String, model: String) {
             self.apiKey = apiKey
             self.model = model
         }
     }
 
     struct OpenRouterConfig: Sendable {
-        public var apiKey: String
-        public var model: String
-        public var advanced: AdvancedOptions = .default
+        var apiKey: String
+        var model: String
+        var advanced: AdvancedOptions = .default
 
-        public init(apiKey: String, model: String) {
+        init(apiKey: String, model: String) {
             self.apiKey = apiKey
             self.model = model
         }
     }
 
     struct AdvancedOptions: Sendable {
-        public static let `default` = AdvancedOptions()
+        static let `default` = AdvancedOptions()
 
         /// Baseline Conduit generation configuration (internal — not part of the public API).
         var baseConfig: Conduit.GenerateConfig
 
-        public var openRouter: OpenRouterOptions
+        var openRouter: OpenRouterOptions
 
-        public init(openRouter: OpenRouterOptions = .default) {
+        init(openRouter: OpenRouterOptions = .default) {
             self.baseConfig = .default
             self.openRouter = openRouter
         }
@@ -239,12 +333,25 @@ public extension LLM {
     }
 
     struct OpenRouterOptions: Sendable {
-        public static let `default` = OpenRouterOptions()
+        static let `default` = OpenRouterOptions()
 
-        public var routing: OpenRouterRouting?
+        var routing: OpenRouterRouting?
 
-        public init(routing: OpenRouterRouting? = nil) {
+        init(routing: OpenRouterRouting? = nil) {
             self.routing = routing
+        }
+    }
+
+    /// Ollama configuration for local inference.
+    struct OllamaConfig: Sendable {
+        /// The Ollama model name (e.g. `"llama3.2"`, `"mistral"`, `"codellama"`).
+        var model: String
+        /// Ollama connection and runtime settings.
+        var settings: OllamaSettings
+
+        init(model: String, settings: OllamaSettings = .default) {
+            self.model = model
+            self.settings = settings
         }
     }
 }

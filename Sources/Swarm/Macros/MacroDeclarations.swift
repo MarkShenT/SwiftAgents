@@ -147,7 +147,7 @@ public macro Parameter(
 
 // MARK: - @AgentActor Macro
 
-/// Generates a complete Agent implementation from an actor with a process() method.
+/// Generates a complete LegacyAgent implementation from an actor with a process() method.
 ///
 /// ## Parameters
 /// - `instructions`: The system instructions for the agent (required).
@@ -185,10 +185,10 @@ public macro AgentActor(
     generateBuilder: Bool = true
 ) = #externalMacro(module: "SwarmMacros", type: "AgentMacro")
 
-/// A macro that generates Agent protocol conformance for an actor.
+/// A macro that generates LegacyAgent protocol conformance for an actor.
 ///
 /// The `@AgentActor` macro reduces boilerplate when creating agents by:
-/// - Generating all Agent protocol property requirements
+/// - Generating all LegacyAgent protocol property requirements
 /// - Creating a standard initializer
 /// - Implementing `run()`, `stream()`, and `cancel()` methods
 ///
@@ -234,7 +234,7 @@ public macro AgentActor(
 /// - `run(_ input:session:observer:)` - Calls your `process()` method
 /// - `stream(_ input:session:observer:)` - Wraps run() in tracked async stream
 /// - `cancel()` - Cancellation support
-/// - `Agent` conformance
+/// - `LegacyAgent` conformance
 ///
 /// ## Requirements
 ///
@@ -415,6 +415,7 @@ public struct PromptString: Sendable, ExpressibleByStringLiteral, ExpressibleByS
 /// ```
 @attached(member, names: arbitrary)
 public macro Builder() = #externalMacro(module: "SwarmMacros", type: "BuilderMacro")
+
 
 // MARK: - PromptString String Interpolation
 

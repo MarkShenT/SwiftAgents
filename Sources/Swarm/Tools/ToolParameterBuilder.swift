@@ -234,15 +234,13 @@ public func Parameter(
 
 // swiftlint:enable identifier_name
 
-// MARK: - ToolArrayBuilder
+// MARK: - ToolBuilder
 
 /// A result builder for constructing arrays of tools.
 ///
-/// Used by `AgentBuilder` to allow declarative tool registration.
-///
 /// Example:
 /// ```swift
-/// @ToolArrayBuilder
+/// @ToolBuilder
 /// func makeTools() -> [any AnyJSONTool] {
 ///     CalculatorTool()
 ///     WeatherTool()
@@ -252,7 +250,12 @@ public func Parameter(
 /// }
 /// ```
 @resultBuilder
-public struct ToolArrayBuilder {
+public struct ToolBuilder {
+    /// Builds an empty tool array for empty builder bodies.
+    public static func buildBlock() -> [any AnyJSONTool] {
+        []
+    }
+
     /// Builds a tool array from multiple tools.
     public static func buildBlock(_ components: (any AnyJSONTool)...) -> [any AnyJSONTool] {
         components
@@ -290,7 +293,7 @@ public struct ToolArrayBuilder {
 
     /// Converts a typed tool to a dynamic tool array.
     public static func buildExpression<T: Tool>(_ expression: T) -> [any AnyJSONTool] {
-        [AnyTool(expression)]
+        [AnyJSONToolAdapter(expression)]
     }
 
     /// Passes through an array of tools.
@@ -303,3 +306,7 @@ public struct ToolArrayBuilder {
         component
     }
 }
+
+/// Deprecated: Use ``ToolBuilder`` instead.
+@available(*, deprecated, renamed: "ToolBuilder")
+public typealias ToolArrayBuilder = ToolBuilder

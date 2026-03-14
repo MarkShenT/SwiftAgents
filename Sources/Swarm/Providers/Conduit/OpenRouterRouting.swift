@@ -7,43 +7,28 @@ import Conduit
 import Foundation
 
 /// OpenRouter routing preferences.
+///
+/// Use via the closure-based configuration on provider factories:
+/// ```swift
+/// let llm: some InferenceProvider = .openRouter(apiKey: key, model: "...") { routing in
+///     routing.providers = [.anthropic]
+/// }
+/// ```
 public struct OpenRouterRouting: Sendable, Hashable {
-    public enum Provider: String, Sendable, Hashable, CaseIterable {
-        case openai
-        case anthropic
-        case google
-        case googleAIStudio
-        case together
-        case fireworks
-        case perplexity
-        case mistral
-        case groq
-        case deepseek
-        case cohere
-        case ai21
-        case bedrock
-        case azure
-    }
-
-    public enum DataCollection: String, Sendable, Hashable, CaseIterable {
-        case allow
-        case deny
-    }
-
-    public var providers: [Provider]?
+    public var providers: [OpenRouterProvider]?
     public var fallbacks: Bool
     public var routeByLatency: Bool
     public var siteURL: URL?
     public var appName: String?
-    public var dataCollection: DataCollection?
+    public var dataCollection: OpenRouterDataCollectionPolicy?
 
     public init(
-        providers: [Provider]? = nil,
+        providers: [OpenRouterProvider]? = nil,
         fallbacks: Bool = true,
         routeByLatency: Bool = false,
         siteURL: URL? = nil,
         appName: String? = nil,
-        dataCollection: DataCollection? = nil
+        dataCollection: OpenRouterDataCollectionPolicy? = nil
     ) {
         self.providers = providers
         self.fallbacks = fallbacks
@@ -66,7 +51,35 @@ public struct OpenRouterRouting: Sendable, Hashable {
     }
 }
 
-private extension OpenRouterRouting.Provider {
+// MARK: - Public Enums
+
+/// OpenRouter inference provider options.
+public enum OpenRouterProvider: String, Sendable, Hashable, CaseIterable {
+    case openai
+    case anthropic
+    case google
+    case googleAIStudio
+    case together
+    case fireworks
+    case perplexity
+    case mistral
+    case groq
+    case deepseek
+    case cohere
+    case ai21
+    case bedrock
+    case azure
+}
+
+/// OpenRouter data collection policy.
+public enum OpenRouterDataCollectionPolicy: String, Sendable, Hashable, CaseIterable {
+    case allow
+    case deny
+}
+
+// MARK: - Conduit Mapping
+
+extension OpenRouterProvider {
     func toConduit() -> Conduit.OpenRouterProvider {
         switch self {
         case .openai:
@@ -101,7 +114,7 @@ private extension OpenRouterRouting.Provider {
     }
 }
 
-private extension OpenRouterRouting.DataCollection {
+extension OpenRouterDataCollectionPolicy {
     func toConduit() -> Conduit.OpenRouterDataCollection {
         switch self {
         case .allow:

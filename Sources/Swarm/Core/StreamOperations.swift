@@ -43,7 +43,7 @@ public extension AsyncThrowingStream where Element == AgentEvent, Failure == Err
     var toolCalls: AsyncThrowingStream<ToolCall, Error> {
         StreamHelper.makeTrackedStream { continuation in
             for try await event in self {
-                if case let .toolCallStarted(call) = event {
+                if case let .tool(.started(call: call)) = event {
                     continuation.yield(call)
                 }
             }
@@ -62,7 +62,7 @@ public extension AsyncThrowingStream where Element == AgentEvent, Failure == Err
     var toolResults: AsyncThrowingStream<ToolResult, Error> {
         StreamHelper.makeTrackedStream { continuation in
             for try await event in self {
-                if case let .toolCallCompleted(_, result) = event {
+                if case let .tool(.completed(call: _, result: result)) = event {
                     continuation.yield(result)
                 }
             }
@@ -157,7 +157,7 @@ public extension AsyncThrowingStream where Element == AgentEvent, Failure == Err
     /// ```
     func filterThinking() -> AsyncThrowingStream<AgentEvent, Error> {
         filter { event in
-            if case .thinking = event { return true }
+            if case .output(.thinking) = event { return true }
             return false
         }
     }
@@ -173,10 +173,10 @@ public extension AsyncThrowingStream where Element == AgentEvent, Failure == Err
     func filterToolEvents() -> AsyncThrowingStream<AgentEvent, Error> {
         filter { event in
             switch event {
-            case .toolCallCompleted,
-                 .toolCallFailed,
-                 .toolCallPartial,
-                 .toolCallStarted:
+            case .tool(.completed),
+                 .tool(.failed),
+                 .tool(.partial),
+                 .tool(.started):
                 true
             default:
                 false
@@ -243,13 +243,13 @@ public extension AsyncThrowingStream where Element == AgentEvent, Failure == Err
     /// Example:
     /// ```swift
     /// for try await thought in stream.mapToThoughts() {
-    ///     print("Agent thinking: \(thought)")
+    ///     print("LegacyAgent thinking: \(thought)")
     /// }
     /// ```
     func mapToThoughts() -> AsyncThrowingStream<String, Error> {
         StreamHelper.makeTrackedStream { continuation in
             for try await event in self {
-                if case let .thinking(thought) = event {
+                if case let .output(.thinking(thought: thought)) = event {
                     continuation.yield(thought)
                 }
             }
@@ -500,7 +500,7 @@ public extension AsyncThrowingStream where Element == AgentEvent, Failure == Err
         _ action: @escaping @Sendable (AgentResult) -> Void
     ) -> AsyncThrowingStream<AgentEvent, Error> {
         onEach { event in
-            if case let .completed(result) = event {
+            if case let .lifecycle(.completed(result: result)) = event {
                 action(result)
             }
         }
@@ -521,7 +521,7 @@ public extension AsyncThrowingStream where Element == AgentEvent, Failure == Err
         _ action: @escaping @Sendable (AgentError) -> Void
     ) -> AsyncThrowingStream<AgentEvent, Error> {
         onEach { event in
-            if case let .failed(error) = event {
+            if case let .lifecycle(.failed(error: error)) = event {
                 action(error)
             }
         }
@@ -879,7 +879,7 @@ public enum AgentEventStream {
                             case .continueAndCollect:
                                 // Convert error to a failed event
                                 let agentError = error as? AgentError ?? .internalError(reason: error.localizedDescription)
-                                await coordinator.yield(.failed(error: agentError))
+                                await coordinator.yield(.lifecycle(.failed(error: agentError)))
                             case .ignoreErrors:
                                 // Silently ignore - legacy behavior
                                 break

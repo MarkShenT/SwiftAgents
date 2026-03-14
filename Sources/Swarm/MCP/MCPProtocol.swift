@@ -40,17 +40,17 @@ import Foundation
 ///     params: ["uri": "file:///example.txt"]
 /// )
 /// ```
-public struct MCPRequest: Sendable, Codable, Equatable {
-    // MARK: Public
+package struct MCPRequest: Sendable, Codable, Equatable {
+    // MARK: Package
 
     /// The JSON-RPC protocol version. Always "2.0".
-    public let jsonrpc: String
+    package let jsonrpc: String
 
     /// A unique identifier for this request.
     ///
     /// Used to correlate responses with their corresponding requests.
     /// Defaults to a new UUID string if not specified.
-    public let id: String
+    package let id: String
 
     /// The name of the method to invoke.
     ///
@@ -62,13 +62,13 @@ public struct MCPRequest: Sendable, Codable, Equatable {
     /// - `resources/read` - Read a resource
     /// - `prompts/list` - List available prompts
     /// - `prompts/get` - Get a prompt
-    public let method: String
+    package let method: String
 
     /// Optional parameters for the method.
     ///
     /// The structure of parameters depends on the method being called.
     /// Use `nil` for methods that do not require parameters.
-    public let params: [String: SendableValue]?
+    package let params: [String: SendableValue]?
 
     // MARK: - Initialization
 
@@ -80,7 +80,7 @@ public struct MCPRequest: Sendable, Codable, Equatable {
     ///   - method: The name of the method to invoke. Must be non-empty.
     ///   - params: Optional parameters for the method. Defaults to `nil`.
     /// - Throws: `MCPError.invalidRequest` if `method` is empty.
-    public init(
+    package init(
         id: String = UUID().uuidString,
         method: String,
         params: [String: SendableValue]? = nil
@@ -99,7 +99,7 @@ public struct MCPRequest: Sendable, Codable, Equatable {
         self.params = params
     }
 
-    public init(from decoder: Decoder) throws {
+    package init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         // Validate jsonrpc version
@@ -139,7 +139,7 @@ public struct MCPRequest: Sendable, Codable, Equatable {
         params = try container.decodeIfPresent([String: SendableValue].self, forKey: .params)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    package func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(jsonrpc, forKey: .jsonrpc)
         try container.encode(id, forKey: .id)
@@ -184,26 +184,26 @@ public struct MCPRequest: Sendable, Codable, Equatable {
 ///     print("Success: \(result)")
 /// }
 /// ```
-public struct MCPResponse: Sendable, Codable, Equatable {
-    // MARK: Public
+package struct MCPResponse: Sendable, Codable, Equatable {
+    // MARK: Package
 
     /// The JSON-RPC protocol version. Always "2.0".
-    public let jsonrpc: String
+    package let jsonrpc: String
 
     /// The identifier matching the corresponding request.
-    public let id: String
+    package let id: String
 
     /// The result of the method invocation, if successful.
     ///
     /// Present when the request was processed successfully.
     /// `nil` when an error occurred.
-    public let result: SendableValue?
+    package let result: SendableValue?
 
     /// The error object, if the request failed.
     ///
     /// Present when an error occurred during processing.
     /// `nil` when the request was successful.
-    public let error: MCPErrorObject?
+    package let error: MCPErrorObject?
 
     // MARK: - Initialization
 
@@ -221,7 +221,7 @@ public struct MCPResponse: Sendable, Codable, Equatable {
     ///
     /// - Throws: `MCPError.invalidRequest` if both `result` and `error` are `nil`,
     ///   or if both are non-nil, which violates JSON-RPC 2.0 specification.
-    public init(
+    package init(
         jsonrpc: String = "2.0",
         id: String,
         result: SendableValue? = nil,
@@ -246,7 +246,7 @@ public struct MCPResponse: Sendable, Codable, Equatable {
 
     // MARK: - Codable
 
-    public init(from decoder: Decoder) throws {
+    package init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         let jsonrpc = try container.decode(String.self, forKey: .jsonrpc)
@@ -288,7 +288,7 @@ public struct MCPResponse: Sendable, Codable, Equatable {
         self.error = error
     }
 
-    public func encode(to encoder: Encoder) throws {
+    package func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(jsonrpc, forKey: .jsonrpc)
         try container.encode(id, forKey: .id)
@@ -325,7 +325,7 @@ public struct MCPResponse: Sendable, Codable, Equatable {
 
 // MARK: - MCPResponse Factory Methods
 
-public extension MCPResponse {
+package extension MCPResponse {
     /// Creates a successful response with the given result.
     ///
     /// - Parameters:
@@ -396,26 +396,26 @@ public extension MCPResponse {
 /// let mcpError = MCPError.invalidParams("Missing required parameter 'name'")
 /// let errorObject = MCPErrorObject.from(mcpError)
 /// ```
-public struct MCPErrorObject: Sendable, Codable, Equatable {
+package struct MCPErrorObject: Sendable, Codable, Equatable {
     /// The error code as defined by JSON-RPC 2.0.
     ///
     /// Standard codes are in the range -32700 to -32600.
     /// Server-defined codes are in the range -32000 to -32099.
     /// Application-defined codes should be outside these ranges.
-    public let code: Int
+    package let code: Int
 
     /// A short description of the error.
     ///
     /// This should be a concise, human-readable message describing
     /// the error condition.
-    public let message: String
+    package let message: String
 
     /// Optional structured data containing additional information about the error.
     ///
     /// This can contain any JSON-serializable data that provides
     /// additional context about the error, such as stack traces,
     /// validation details, or retry information.
-    public let data: SendableValue?
+    package let data: SendableValue?
 
     // MARK: - Initialization
 
@@ -425,7 +425,7 @@ public struct MCPErrorObject: Sendable, Codable, Equatable {
     ///   - code: The error code as defined by JSON-RPC 2.0.
     ///   - message: A short description of the error.
     ///   - data: Optional structured data containing additional information.
-    public init(code: Int, message: String, data: SendableValue? = nil) {
+    package init(code: Int, message: String, data: SendableValue? = nil) {
         self.code = code
         self.message = message
         self.data = data
@@ -440,7 +440,7 @@ public struct MCPErrorObject: Sendable, Codable, Equatable {
     ///
     /// - Parameter error: The MCPError to convert.
     /// - Returns: An MCPErrorObject with the same code, message, and data.
-    public static func from(_ error: MCPError) -> MCPErrorObject {
+    package static func from(_ error: MCPError) -> MCPErrorObject {
         MCPErrorObject(
             code: error.code,
             message: error.message,
@@ -462,7 +462,7 @@ extension MCPErrorObject {
 // MARK: CustomDebugStringConvertible
 
 extension MCPErrorObject: CustomDebugStringConvertible {
-    public var debugDescription: String {
+    package var debugDescription: String {
         if let data {
             "MCPErrorObject(code: \(code), message: \"\(message)\", data: \(data.debugDescription))"
         } else {

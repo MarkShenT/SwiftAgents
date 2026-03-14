@@ -1,12 +1,12 @@
 // AnyToolTests.swift
 // SwarmTests
 //
-// Verifies AnyTool type-erasure preserves tool metadata and guardrails.
+// Verifies AnyJSONTool guardrail forwarding still works after AnyTool removal.
 
 @testable import Swarm
 import Testing
 
-@Suite("AnyTool Tests")
+@Suite("AnyJSONTool Guardrail Tests")
 struct AnyToolTests {
     private struct GuardrailedTool: AnyJSONTool {
         let name: String = "guarded"
@@ -28,7 +28,7 @@ struct AnyToolTests {
         }
     }
 
-    @Test("AnyTool forwards input/output guardrails")
+    @Test("AnyJSONTool forwards input/output guardrails")
     func forwardsGuardrails() {
         let input = ClosureToolInputGuardrail(name: "tripwire") { _ in
             .tripwire(message: "blocked")
@@ -37,20 +37,20 @@ struct AnyToolTests {
             .passed()
         }
 
-        let erased = AnyTool(GuardrailedTool(inputGuardrails: [input], outputGuardrails: [output]))
+        let tool = GuardrailedTool(inputGuardrails: [input], outputGuardrails: [output])
 
-        #expect(erased.inputGuardrails.count == 1)
-        #expect(erased.outputGuardrails.count == 1)
+        #expect(tool.inputGuardrails.count == 1)
+        #expect(tool.outputGuardrails.count == 1)
     }
 
-    @Test("ToolRegistry executes guardrails for AnyTool-wrapped tools")
+    @Test("ToolRegistry executes guardrails for AnyJSONTool tools")
     func registryRunsGuardrailsForWrappedTool() async throws {
         let input = ClosureToolInputGuardrail(name: "tripwire") { _ in
             .tripwire(message: "blocked")
         }
 
         let tool = GuardrailedTool(inputGuardrails: [input])
-        let registry = try ToolRegistry(tools: [AnyTool(tool)])
+        let registry = try ToolRegistry(tools: [tool])
 
         do {
             _ = try await registry.execute(toolNamed: tool.name, arguments: [:])

@@ -117,11 +117,11 @@ struct AgentLiveToolCallStreamingTests {
         }
 
         let partialIndex = events.firstIndex { event in
-            if case .toolCallPartial = event { return true }
+            if case .tool(.partial) = event { return true }
             return false
         }
         let toolStartIndex = events.firstIndex { event in
-            if case .toolCallStarted = event { return true }
+            if case .tool(.started) = event { return true }
             return false
         }
 
@@ -132,16 +132,16 @@ struct AgentLiveToolCallStreamingTests {
         }
 
         if let idx = toolStartIndex,
-           case let .toolCallStarted(call) = events[idx]
+           case let .tool(.started(call: call)) = events[idx]
         {
             #expect(call.providerCallId == "call_1")
             #expect(call.toolName == "echo")
         } else {
-            Issue.record("Missing expected toolCallStarted event")
+            Issue.record("Missing expected tool(.started) event")
         }
 
-        if let completedEvent = events.last(where: { if case .completed = $0 { true } else { false } }),
-           case let .completed(result) = completedEvent
+        if let completedEvent = events.last(where: { if case .lifecycle(.completed) = $0 { true } else { false } }),
+           case let .lifecycle(.completed(result: result)) = completedEvent
         {
             #expect(result.output == "All done")
             #expect(result.toolCalls.first?.providerCallId == "call_1")
@@ -250,7 +250,7 @@ struct AgentLiveToolCallStreamingTests {
         }
 
         #expect(events.contains { event in
-            if case .toolCallPartial = event { return true }
+            if case .tool(.partial) = event { return true }
             return false
         })
     }

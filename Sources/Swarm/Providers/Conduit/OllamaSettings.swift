@@ -6,6 +6,14 @@
 import Conduit
 
 /// Configuration for Ollama local inference.
+///
+/// Use via the closure-based configuration on provider factories:
+/// ```swift
+/// let llm: some InferenceProvider = .ollama("mistral") { settings in
+///     settings.host = "127.0.0.1"
+///     settings.port = 11435
+/// }
+/// ```
 public struct OllamaSettings: Sendable, Hashable {
     public var host: String
     public var port: Int

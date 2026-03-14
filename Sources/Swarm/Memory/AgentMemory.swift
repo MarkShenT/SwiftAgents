@@ -218,3 +218,64 @@ public actor AnyMemory: Memory {
     private let _count: @Sendable () async -> Int
     private let _isEmpty: @Sendable () async -> Bool
 }
+
+// MARK: - AnyMemory Factory Methods
+
+public extension AnyMemory {
+    /// Creates an `AnyMemory` wrapping a `ConversationMemory`.
+    ///
+    /// - Parameter maxMessages: Maximum messages to retain (default: 100).
+    /// - Returns: A type-erased memory backed by `ConversationMemory`.
+    static func conversation(maxMessages: Int = 100) -> AnyMemory {
+        AnyMemory(ConversationMemory(maxMessages: maxMessages))
+    }
+
+    /// Creates an `AnyMemory` wrapping a `SlidingWindowMemory`.
+    ///
+    /// - Parameter maxTokens: Maximum tokens to retain (default: 4000).
+    /// - Returns: A type-erased memory backed by `SlidingWindowMemory`.
+    static func slidingWindow(maxTokens: Int = 4000) -> AnyMemory {
+        AnyMemory(SlidingWindowMemory(maxTokens: maxTokens))
+    }
+
+    /// Creates an `AnyMemory` wrapping a `VectorMemory`.
+    ///
+    /// - Parameters:
+    ///   - embeddingProvider: Provider for generating text embeddings.
+    ///   - similarityThreshold: Minimum similarity for results (0–1, default: 0.7).
+    ///   - maxResults: Maximum results to return (default: 10).
+    /// - Returns: A type-erased memory backed by `VectorMemory`.
+    static func vector(
+        embeddingProvider: any EmbeddingProvider,
+        similarityThreshold: Float = 0.7,
+        maxResults: Int = 10
+    ) -> AnyMemory {
+        AnyMemory(VectorMemory(
+            embeddingProvider: embeddingProvider,
+            similarityThreshold: similarityThreshold,
+            maxResults: maxResults
+        ))
+    }
+
+    /// Creates an `AnyMemory` wrapping a `PersistentMemory`.
+    ///
+    /// Defaults to an `InMemoryBackend` when no backend is provided, making
+    /// it suitable for testing and prototyping without database dependencies.
+    ///
+    /// - Parameters:
+    ///   - backend: The storage backend (default: `InMemoryBackend()`).
+    ///   - conversationId: Unique identifier for this conversation (default: random UUID).
+    ///   - maxMessages: Maximum messages to retain; 0 means unlimited (default: 0).
+    /// - Returns: A type-erased memory backed by `PersistentMemory`.
+    static func persistent(
+        backend: any PersistentMemoryBackend = InMemoryBackend(),
+        conversationId: String = UUID().uuidString,
+        maxMessages: Int = 0
+    ) -> AnyMemory {
+        AnyMemory(PersistentMemory(
+            backend: backend,
+            conversationId: conversationId,
+            maxMessages: maxMessages
+        ))
+    }
+}

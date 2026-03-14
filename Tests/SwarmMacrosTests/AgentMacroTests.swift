@@ -181,19 +181,19 @@ final class AgentMacroTests: XCTestCase {
                     ) -> AsyncThrowingStream<AgentEvent, Error> {
                         StreamHelper.makeTrackedStream(for: self) { agent, continuation in
                             do {
-                                continuation.yield(.started(input: input))
+                                continuation.yield(.lifecycle(.started(input: input)))
                                 let result = try await agent.run(input, session: session, observer: observer)
-                                continuation.yield(.completed(result: result))
+                                continuation.yield(.lifecycle(.completed(result: result)))
                                 continuation.finish()
                             } catch let error as AgentError {
-                                continuation.yield(.failed(error: error))
+                                continuation.yield(.lifecycle(.failed(error: error)))
                                 continuation.finish(throwing: error)
                             } catch let error as GuardrailError {
-                                continuation.yield(.guardrailFailed(error: error))
+                                continuation.yield(.lifecycle(.guardrailFailed(error: error)))
                                 continuation.finish(throwing: error)
                             } catch {
                                 let agentError = AgentError.internalError(reason: error.localizedDescription)
-                                continuation.yield(.failed(error: agentError))
+                                continuation.yield(.lifecycle(.failed(error: agentError)))
                                 continuation.finish(throwing: agentError)
                             }
                         }
@@ -467,19 +467,19 @@ final class AgentMacroTests: XCTestCase {
                     ) -> AsyncThrowingStream<AgentEvent, Error> {
                         StreamHelper.makeTrackedStream(for: self) { agent, continuation in
                             do {
-                                continuation.yield(.started(input: input))
+                                continuation.yield(.lifecycle(.started(input: input)))
                                 let result = try await agent.run(input, session: session, observer: observer)
-                                continuation.yield(.completed(result: result))
+                                continuation.yield(.lifecycle(.completed(result: result)))
                                 continuation.finish()
                             } catch let error as AgentError {
-                                continuation.yield(.failed(error: error))
+                                continuation.yield(.lifecycle(.failed(error: error)))
                                 continuation.finish(throwing: error)
                             } catch let error as GuardrailError {
-                                continuation.yield(.guardrailFailed(error: error))
+                                continuation.yield(.lifecycle(.guardrailFailed(error: error)))
                                 continuation.finish(throwing: error)
                             } catch {
                                 let agentError = AgentError.internalError(reason: error.localizedDescription)
-                                continuation.yield(.failed(error: agentError))
+                                continuation.yield(.lifecycle(.failed(error: agentError)))
                                 continuation.finish(throwing: agentError)
                             }
                         }
@@ -693,19 +693,19 @@ extension AgentMacroTests {
                     ) -> AsyncThrowingStream<AgentEvent, Error> {
                         StreamHelper.makeTrackedStream(for: self) { agent, continuation in
                             do {
-                                continuation.yield(.started(input: input))
+                                continuation.yield(.lifecycle(.started(input: input)))
                                 let result = try await agent.run(input, session: session, observer: observer)
-                                continuation.yield(.completed(result: result))
+                                continuation.yield(.lifecycle(.completed(result: result)))
                                 continuation.finish()
                             } catch let error as AgentError {
-                                continuation.yield(.failed(error: error))
+                                continuation.yield(.lifecycle(.failed(error: error)))
                                 continuation.finish(throwing: error)
                             } catch let error as GuardrailError {
-                                continuation.yield(.guardrailFailed(error: error))
+                                continuation.yield(.lifecycle(.guardrailFailed(error: error)))
                                 continuation.finish(throwing: error)
                             } catch {
                                 let agentError = AgentError.internalError(reason: error.localizedDescription)
-                                continuation.yield(.failed(error: agentError))
+                                continuation.yield(.lifecycle(.failed(error: agentError)))
                                 continuation.finish(throwing: agentError)
                             }
                         }

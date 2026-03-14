@@ -45,12 +45,36 @@ struct ConduitProviderSelectionTests {
         )
 
         let config = routing.toConduit()
-        #expect(config.providers?.map { $0.slug } == ["anthropic", "openai"])
+        #expect(config.providers?.map(\.slug) == ["anthropic", "openai"])
         #expect(config.fallbacks == false)
         #expect(config.routeByLatency == true)
         #expect(config.siteURL == url)
         #expect(config.appName == "Swarm")
         #expect(config.dataCollection == Conduit.OpenRouterDataCollection.deny)
+    }
+
+    @Test("Closure-based Ollama configuration")
+    func closureBasedOllama() {
+        let provider = ConduitProviderSelection
+            .ollama(model: "llama3.2") { settings in
+                settings.host = "192.168.1.100"
+                settings.port = 11435
+            }
+            .makeProvider()
+
+        #expect(provider is ConduitInferenceProvider<OpenAIProvider>)
+    }
+
+    @Test("Closure-based OpenRouter configuration")
+    func closureBasedOpenRouter() {
+        let provider = ConduitProviderSelection
+            .openRouter(apiKey: "test-key", model: "anthropic/claude-3-opus") { routing in
+                routing.providers = [.anthropic]
+                routing.fallbacks = false
+            }
+            .makeProvider()
+
+        #expect(provider is ConduitInferenceProvider<OpenAIProvider>)
     }
 
     @Test("Maps Ollama settings to Conduit config")

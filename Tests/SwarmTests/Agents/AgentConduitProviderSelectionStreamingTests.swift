@@ -78,7 +78,7 @@ struct AgentConduitProviderSelectionStreamingTests {
 
         var sawPartial = false
         for try await event in agent.stream("Hi") {
-            if case .toolCallPartial = event {
+            if case .tool(.partial) = event {
                 sawPartial = true
                 break
             }
