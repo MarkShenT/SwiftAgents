@@ -54,6 +54,7 @@ website/
 # API audit working documents
 docs/reference/api-surface-catalog.md
 docs/reference/api-improvement-report.md
+docs/reference/api-quality-assessment.md
 
 # VitePress / Node
 node_modules/

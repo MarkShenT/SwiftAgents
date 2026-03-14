@@ -16,7 +16,7 @@ hero:
 features:
   - icon: "\U0001F517"
     title: Compose Workflows Fluently
-    details: Build sequential, parallel, and routed workflows with `WorkflowV3().step(...).parallel(...).route(...)`.
+    details: Build sequential, parallel, and routed workflows with `Workflow().step(...).parallel(...).route(...)`.
     link: /guide/getting-started
     linkText: Learn workflows
 
@@ -40,7 +40,7 @@ features:
 
   - icon: "\U0001F50C"
     title: Any LLM, Same Code
-    details: Foundation Models, Anthropic, OpenAI, Ollama, Gemini, MLX. Swap providers with `.provider(...)`.
+    details: Foundation Models, Anthropic, OpenAI, Ollama, Gemini, MLX. Swap providers with `inferenceProvider:` at init.
     link: /providers
     linkText: Configure providers
 
@@ -62,21 +62,6 @@ features:
 ```swift
 import Swarm
 
-// V3 modifier chain -- the fastest path to a working agent
-let agent = AgentV3("Answer finance questions using real data.") {
-    PriceTool()
-}
-.named("Analyst")
-.provider(.anthropic(key: "sk-..."))
-
-let result = try await agent.run("What is AAPL trading at?")
-```
-
-Or using the primary `Agent` struct init:
-
-```swift
-import Swarm
-
 @Tool("Looks up the current stock price")
 struct PriceTool {
     @Parameter("Ticker symbol") var ticker: String
@@ -84,10 +69,12 @@ struct PriceTool {
 }
 
 let agent = try Agent(
-    tools: [PriceTool()],
-    instructions: "Answer finance questions using real data.",
+    "Answer finance questions using real data.",
+    configuration: .default.name("Analyst"),
     inferenceProvider: .anthropic(key: "sk-...")
-)
+) {
+    PriceTool()
+}
 
 let result = try await agent.run("What is AAPL trading at?")
 ```
@@ -95,10 +82,10 @@ let result = try await agent.run("What is AAPL trading at?")
 ## Multi-Agent Workflow
 
 ```swift
-let result = try await WorkflowV3()
+let result = try await Workflow()
     .step(researchAgent)
     .step(writerAgent)
-    .run(input: "Write about Swift concurrency.")
+    .run("Write about Swift concurrency.")
 ```
 
 ## How Swarm Compares

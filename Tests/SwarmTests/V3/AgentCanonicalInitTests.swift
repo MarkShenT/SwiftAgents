@@ -1,13 +1,13 @@
-// AgentV3InitTests.swift
+// AgentCanonicalInitTests.swift
 // SwarmTests
 //
-// TDD tests for V3 canonical Agent init with @ToolBuilder trailing closure.
+// TDD tests for canonical Agent init with @ToolBuilder trailing closure.
 
 import Testing
 @testable import Swarm
 
-@Suite("Agent V3 Canonical Init")
-struct AgentV3InitTests {
+@Suite("Agent Canonical Init")
+struct AgentCanonicalInitTests {
     @Test("minimal init - instructions only")
     func minimalInit() throws {
         let agent = try Agent("Be helpful.")

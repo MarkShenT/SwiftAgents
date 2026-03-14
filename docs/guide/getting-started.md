@@ -23,9 +23,7 @@ targets: [
 
 ## Your First Agent
 
-### Using `Agent` (struct init)
-
-The primary way to create an agent is with the `Agent` struct initializer:
+The primary way to create an agent is with the `Agent` struct initializer. The canonical init takes an unlabeled instructions string and a `@ToolBuilder` trailing closure for tools:
 
 ```swift
 import Swarm
@@ -39,38 +37,20 @@ struct PriceTool {
 }
 
 // 2. Create an agent with tools
-let agent = try Agent(
-    tools: [PriceTool()],
-    instructions: "Answer finance questions using real data.",
-    inferenceProvider: .anthropic(key: "sk-...")
-)
+let agent = try Agent("Answer finance questions using real data.",
+    configuration: .default.name("Analyst"),
+    inferenceProvider: .anthropic(key: "sk-..."),
+    memory: .conversation(limit: 50),
+    inputGuardrails: [.maxLength(5000), .notEmpty()]
+) {
+    PriceTool()
+    CalculatorTool()
+}
 
 // 3. Run it
 let result = try await agent.run("What is AAPL trading at?")
 print(result.output) // "Apple (AAPL) is currently trading at $182.50."
 ```
-
-### Using `AgentV3` (modifier chain)
-
-`AgentV3` provides a fluent modifier-chain API for building agents inline:
-
-```swift
-import Swarm
-
-let agent = AgentV3("Answer finance questions using real data.") {
-    PriceTool()
-    CalculatorTool()
-}
-.named("Analyst")
-.provider(.anthropic(key: "sk-..."))
-.memory(.conversation(limit: 50))
-.guardrails(.maxInput(5000), .inputNotEmpty)
-
-let result = try await agent.run("What is AAPL trading at?")
-print(result.output) // "Apple (AAPL) is currently trading at $182.50."
-```
-
-The `AgentV3` init takes a system prompt string and a `@ToolBuilder` trailing closure for tools. Modifiers like `.named()`, `.provider()`, `.memory()`, and `.guardrails()` chain immutably -- each returns a new configured agent.
 
 ## Creating Tools
 
@@ -91,28 +71,50 @@ struct WebSearchTool {
 }
 ```
 
-### `InlineTool` (one-off closures)
+### `FunctionTool` (one-off closures)
 
 For quick inline tools that do not need a full struct:
 
 ```swift
-let reverse = InlineTool("reverse", "Reverses a string") { (s: String) in
-    String(s.reversed())
+let reverse = FunctionTool(
+    name: "reverse",
+    description: "Reverses a string",
+    parameters: [
+        ToolParameter(name: "s", description: "String to reverse", type: .string, isRequired: true)
+    ]
+) { args in
+    let s = try args.require("s", as: String.self)
+    return .string(String(s.reversed()))
 }
 ```
 
-Use `InlineTool` inside a `@ToolBuilder` closure:
+Use `FunctionTool` inside a `@ToolBuilder` closure:
 
 ```swift
-let agent = AgentV3("You are a helpful text utility.") {
-    InlineTool("reverse", "Reverses a string") { (s: String) in
-        String(s.reversed())
+let agent = try Agent("You are a helpful text utility.",
+    inferenceProvider: .anthropic(key: "sk-...")
+) {
+    FunctionTool(
+        name: "reverse",
+        description: "Reverses a string",
+        parameters: [
+            ToolParameter(name: "s", description: "String to reverse", type: .string, isRequired: true)
+        ]
+    ) { args in
+        let s = try args.require("s", as: String.self)
+        return .string(String(s.reversed()))
     }
-    InlineTool("uppercase", "Uppercases a string") { (s: String) in
-        s.uppercased()
+    FunctionTool(
+        name: "uppercase",
+        description: "Uppercases a string",
+        parameters: [
+            ToolParameter(name: "s", description: "String to uppercase", type: .string, isRequired: true)
+        ]
+    ) { args in
+        let s = try args.require("s", as: String.self)
+        return .string(s.uppercased())
     }
 }
-.provider(.anthropic(key: "sk-..."))
 ```
 
 ## Running Agents
@@ -167,14 +169,14 @@ for message in await conversation.messages {
 
 ### Sequential pipeline
 
-Compose multi-agent execution with `WorkflowV3`:
+Compose multi-agent execution with `Workflow`:
 
 ```swift
-let result = try await WorkflowV3()
+let result = try await Workflow()
     .step(researchAgent)
     .step(analyzeAgent)
     .step(writerAgent)
-    .run(input: "Summarize the WWDC session on Swift concurrency.")
+    .run("Summarize the WWDC session on Swift concurrency.")
 ```
 
 ### Parallel fan-out
@@ -182,9 +184,9 @@ let result = try await WorkflowV3()
 Run multiple agents in parallel and merge their results:
 
 ```swift
-let result = try await WorkflowV3()
+let result = try await Workflow()
     .parallel([bullAgent, bearAgent, analystAgent], merge: .structured)
-    .run(input: "Evaluate Apple's Q4 earnings.")
+    .run("Evaluate Apple's Q4 earnings.")
 ```
 
 ### Routing
@@ -192,47 +194,47 @@ let result = try await WorkflowV3()
 Route to different agents based on input content:
 
 ```swift
-let result = try await WorkflowV3()
+let result = try await Workflow()
     .route { input in
         if input.contains("$") { return mathAgent }
         if input.contains("weather") { return weatherAgent }
         return generalAgent
     }
-    .run(input: "What is 15% of $240?")
+    .run("What is 15% of $240?")
 ```
 
-### Advanced: checkpoint and resume
+### Durable: checkpoint and resume
 
-For checkpoint/resume and other power features, use the namespaced advanced API:
+For checkpoint/resume and other power features, use the namespaced durable API:
 
 ```swift
-let result = try await WorkflowV3()
+let result = try await Workflow()
     .step(fetchAgent)
     .step(analyzeAgent)
-    .advanced
+    .durable
     .checkpoint(id: "report-v1", policy: .everyStep)
-    .advanced
-    .checkpointStore(.fileSystem(directory: checkpointsURL))
-    .advanced
-    .run("Summarize the WWDC session", resumeFrom: nil)
+    .durable
+    .checkpointing(.fileSystem(directory: checkpointsURL))
+    .durable
+    .execute("Summarize the WWDC session", resumeFrom: nil)
 ```
 
 ## Choosing a Provider
 
-Swarm supports multiple inference providers. Swap with one line:
+Swarm supports multiple inference providers. Pass via the `inferenceProvider:` init parameter:
 
 ```swift
 // On-device (private, no network)
-.provider(.foundationModels)
+let agent = try Agent("You are helpful.", inferenceProvider: .foundationModels)
 
 // Anthropic
-.provider(.anthropic(key: "sk-..."))
+let agent = try Agent("You are helpful.", inferenceProvider: .anthropic(key: "sk-..."))
 
 // OpenAI
-.provider(.openAI(key: "sk-..."))
+let agent = try Agent("You are helpful.", inferenceProvider: .openAI(key: "sk-..."))
 
 // Ollama (local)
-.provider(.ollama())
+let agent = try Agent("You are helpful.", inferenceProvider: .ollama())
 ```
 
 Or using the `.environment()` modifier on any `AgentRuntime`:
@@ -257,6 +259,6 @@ Foundation Models require iOS 26 / macOS 26. Cloud providers (Anthropic, OpenAI,
 ## Next Steps
 
 - **[Agents](/agents)** -- Agent types, configuration, tool calling
-- **[Tools](/tools)** -- `@Tool` macro, `InlineTool`, tool chains
-- **Workflow** -- Use `WorkflowV3` for sequential, parallel, and routed execution
+- **[Tools](/tools)** -- `@Tool` macro, `FunctionTool`, tool chains
+- **Workflow** -- Use `Workflow` for sequential, parallel, and routed execution
 - **[Memory](/memory)** -- Conversation, vector, summary, persistent

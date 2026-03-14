@@ -88,6 +88,16 @@ try Agent(
 )
 ```
 
+### Typed-tools convenience
+
+```swift
+try Agent(
+    tools: [some Tool] = [],
+    instructions: String = "",
+    ...
+)
+```
+
 ### Handoff-agents convenience
 
 ```swift
@@ -99,40 +109,75 @@ try Agent(
 )
 ```
 
-## 4) AgentV3 (modifier chain)
+## 4) Agent (V3 canonical init with @ToolBuilder)
 
-Fluent modifier-chain API for building agents inline. Takes a system prompt and a `@ToolBuilder` trailing closure for tools.
+The recommended path for creating agents in V3. Takes an unlabeled instructions string and a `@ToolBuilder` trailing closure for tools. All other parameters are init arguments, not modifier methods.
 
 ```swift
-public struct AgentV3: AgentRuntime
+try Agent(
+    _ instructions: String,
+    configuration: AgentConfiguration = .default,
+    memory: (any Memory)? = nil,
+    inferenceProvider: (any InferenceProvider)? = nil,
+    tracer: (any Tracer)? = nil,
+    inputGuardrails: [any InputGuardrail] = [],
+    outputGuardrails: [any OutputGuardrail] = [],
+    guardrailRunnerConfiguration: GuardrailRunnerConfiguration = .default,
+    handoffs: [AnyHandoffConfiguration] = [],
+    @ToolBuilder tools: () -> [any AnyJSONTool] = { [] }
+)
 ```
 
-### Construction
+### Example usage
 
 ```swift
-AgentV3("You are a helpful assistant.") {
+let agent = try Agent("You are a helpful assistant.") {
     WeatherTool()
     CalculatorTool()
 }
-.named("Assistant")
-.provider(.anthropic(key: "sk-..."))
-.memory(.conversation(limit: 50))
-.guardrails(.maxInput(5000), .inputNotEmpty)
 ```
 
-### Modifiers
+### With additional init parameters
 
-| Modifier | Purpose |
-|----------|---------|
-| `.named(_ name: String)` | Set agent name |
-| `.provider(_ provider: some InferenceProvider)` | Set inference provider |
-| `.memory(_ memory: MemoryOption)` | Attach memory strategy |
-| `.guardrails(_ specs: GuardrailSpec...)` | Add input/output guardrails |
-| `.handoffs(_ agents: any AgentRuntime...)` | Add handoff targets |
-| `.tracer(_ tracer: some Tracer)` | Attach tracer |
-| `.configuration(_ config: AgentConfiguration)` | Override configuration |
+```swift
+let agent = try Agent(
+    "You are a helpful assistant.",
+    configuration: .init(name: "Assistant"),
+    memory: .conversation(limit: 50),
+    inferenceProvider: .anthropic(key: "sk-..."),
+    inputGuardrails: [MaxInputLengthGuardrail(maxLength: 5000)],
+    handoffs: [AnyHandoffConfiguration(targetAgent: supportAgent)]
+) {
+    WeatherTool()
+    CalculatorTool()
+}
+```
 
-## 5) ToolV3 and InlineTool
+### Init parameters
+
+| Parameter | Type | Default | Purpose |
+|-----------|------|---------|---------|
+| `_ instructions` | `String` | (required) | System instructions defining agent behavior |
+| `configuration` | `AgentConfiguration` | `.default` | Agent configuration (name, max iterations, etc.) |
+| `memory` | `(any Memory)?` | `nil` | Memory strategy for conversation history |
+| `inferenceProvider` | `(any InferenceProvider)?` | `nil` | LLM provider (resolved via provider chain if nil) |
+| `tracer` | `(any Tracer)?` | `nil` | Observability tracer |
+| `inputGuardrails` | `[any InputGuardrail]` | `[]` | Input validation guardrails |
+| `outputGuardrails` | `[any OutputGuardrail]` | `[]` | Output validation guardrails |
+| `guardrailRunnerConfiguration` | `GuardrailRunnerConfiguration` | `.default` | Guardrail runner settings |
+| `handoffs` | `[AnyHandoffConfiguration]` | `[]` | Handoff targets for multi-agent orchestration |
+| `tools` | `@ToolBuilder () -> [any AnyJSONTool]` | `{ [] }` | Trailing closure producing the agent's tools |
+
+### Runtime modifiers (on AgentRuntime)
+
+Only `.environment()` and `.memory()` exist as modifier methods, provided by `AgentRuntime` extensions:
+
+```swift
+agent.environment(\.inferenceProvider, myProvider)  // returns EnvironmentAgent
+agent.observed(by: myObserver)                      // returns some AgentRuntime
+```
+
+## 5) Tool and FunctionTool
 
 ### `@Tool` macro (recommended)
 
@@ -145,38 +190,43 @@ struct PriceTool {
 }
 ```
 
-### `InlineTool` (closure shorthand)
+### `FunctionTool` (closure shorthand)
 
 ```swift
-InlineTool("reverse", "Reverses a string") { (s: String) in
-    String(s.reversed())
+let greet = FunctionTool(
+    name: "greet",
+    description: "Greets a user",
+    parameters: [ToolParameter(name: "name", description: "User name", type: .string, isRequired: true)]
+) { args in
+    let name = try args.require("name", as: String.self)
+    return .string("Hello, \(name)!")
 }
 ```
 
 ### `@ToolBuilder` result builder
 
-Used as the trailing closure in `AgentV3`. No brackets, no commas:
+Used as the trailing closure in the canonical `Agent` init. No brackets, no commas:
 
 ```swift
-AgentV3("instructions") {
+Agent("instructions") {
     PriceTool()
-    InlineTool("greet", "Greets user") { (name: String) in "Hello, \(name)!" }
+    greet
 }
 ```
 
-## 6) ConversationV3
+## 6) Conversation
 
 Stateful multi-turn conversation wrapper.
 
 ```swift
-public actor ConversationV3 {
+public actor Conversation {
     public struct Message: Sendable, Equatable {
         public enum Role: String, Sendable { case user, assistant }
         public let role: Role
         public let text: String
     }
 
-    public init(with agent: some AgentRuntime, session: (any Session)? = nil)
+    public init(with agent: some AgentRuntime, session: (any Session)? = nil, observer: (any AgentObserver)? = nil)
     public var messages: [Message] { get }
 
     @discardableResult
@@ -189,14 +239,15 @@ public actor ConversationV3 {
 }
 ```
 
-## 7) WorkflowV3
+## 7) Workflow
 
 Fluent multi-agent pipeline composition.
 
 ```swift
-public struct WorkflowV3 {
-    public enum MergeStrategy {
+public struct Workflow: Sendable {
+    public enum MergeStrategy: @unchecked Sendable {
         case structured
+        case indexed
         case first
         case custom(@Sendable ([AgentResult]) -> String)
     }
@@ -204,33 +255,33 @@ public struct WorkflowV3 {
     public init()
 
     // Composition
-    public func step(_ agent: some AgentRuntime) -> WorkflowV3
-    public func parallel(_ agents: [any AgentRuntime], merge: MergeStrategy = .structured) -> WorkflowV3
-    public func route(_ condition: @escaping @Sendable (String) -> (any AgentRuntime)?) -> WorkflowV3
-    public func repeatUntil(maxIterations: Int = 100, _ condition: @escaping @Sendable (AgentResult) -> Bool) -> WorkflowV3
-    public func timeout(_ duration: Duration) -> WorkflowV3
-    public func observed(by observer: some AgentObserver) -> WorkflowV3
+    public func step(_ agent: some AgentRuntime) -> Workflow
+    public func parallel(_ agents: [any AgentRuntime], merge: MergeStrategy = .structured) -> Workflow
+    public func route(_ condition: @escaping @Sendable (String) -> (any AgentRuntime)?) -> Workflow
+    public func repeatUntil(maxIterations: Int = 100, _ condition: @escaping @Sendable (AgentResult) -> Bool) -> Workflow
+    public func timeout(_ duration: Duration) -> Workflow
+    public func observed(by observer: some AgentObserver) -> Workflow
 
-    // Execution
-    public func run(input: String) async throws -> AgentResult
-    public func stream(input: String) -> AsyncThrowingStream<AgentEvent, Error>
+    // Execution (unlabeled input parameter)
+    public func run(_ input: String) async throws -> AgentResult
+    public func stream(_ input: String) -> AsyncThrowingStream<AgentEvent, Error>
 
-    // Advanced features
-    public var advanced: Advanced { get }
+    // Durable namespace
+    public var durable: Durable { get }
 }
 ```
 
-### Advanced namespace
+### Durable namespace
 
 ```swift
-public extension WorkflowV3 {
-    struct Advanced {
-        enum CheckpointPolicy { case endOnly, everyStep }
+public extension Workflow {
+    struct Durable: Sendable {
+        enum CheckpointPolicy: Sendable { case onCompletion, everyStep }
 
-        func checkpoint(id: String, policy: CheckpointPolicy = .endOnly) -> WorkflowV3
-        func checkpointStore(_ checkpointing: WorkflowCheckpointing) -> WorkflowV3
-        func fallback(primary: some AgentRuntime, to backup: some AgentRuntime, retries: Int = 0) -> WorkflowV3
-        func run(_ input: String, resumeFrom checkpointID: String? = nil) async throws -> AgentResult
+        func checkpoint(id: String, policy: CheckpointPolicy = .onCompletion) -> Workflow
+        func checkpointing(_ checkpointing: WorkflowCheckpointing) -> Workflow
+        func fallback(primary: some AgentRuntime, to backup: some AgentRuntime, retries: Int = 0) -> Workflow
+        func execute(_ input: String, resumeFrom checkpointID: String? = nil) async throws -> AgentResult
     }
 }
 
@@ -240,7 +291,7 @@ WorkflowCheckpointing.fileSystem(directory: URL)
 
 ## 8) GuardrailSpec
 
-Concrete guardrail descriptors with static factories. Used with the `.guardrails()` modifier on `AgentV3`.
+Concrete guardrail descriptors with static factories. Used as init parameters on `Agent`.
 
 ```swift
 public struct GuardrailSpec: Sendable {
@@ -284,7 +335,7 @@ public struct RunOptions: Sendable {
 
 ## 10) MemoryOption
 
-Dot-syntax memory factories used with the `.memory()` modifier.
+Dot-syntax memory factories used with the `memory` init parameter.
 
 ```swift
 public struct MemoryOption {
@@ -297,17 +348,16 @@ public struct MemoryOption {
 
 ## 11) HandoffTool
 
-Agents passed to `.handoffs()` are automatically wrapped as tool calls. The LLM can invoke them to delegate control.
+Agents passed via the `handoffs` or `handoffAgents` init parameters are automatically wrapped as tool calls. The LLM can invoke them to delegate control.
 
 ```swift
-// Via AgentV3 modifier
-AgentV3("Route requests to the right specialist.") {
+// Via V3 canonical init
+let agent = try Agent("Route requests to the right specialist.") {
     // tools
 }
-.handoffs(billingAgent, supportAgent, salesAgent)
 
-// Via Agent init
-try Agent(
+// With handoff agents (convenience init)
+let triage = try Agent(
     instructions: "Route requests.",
     handoffAgents: [billingAgent, supportAgent, salesAgent]
 )
@@ -384,5 +434,5 @@ public struct AgentResult: Sendable {
 - Handoff callback naming is `onTransfer` / `transform` / `when`.
 - Every public type conforms to `Sendable`.
 - Agent is a struct (value type). Execution state lives in `run()`.
-- `WorkflowV3` is the single coordination primitive.
+- `Workflow` is the single coordination primitive.
 - No legacy types: `AgentBuilder`, `AnyAgent`, `AnyTool`, `ClosureInputGuardrail`, `ClosureOutputGuardrail`, `AgentBlueprint`, `AgentLoop`.
