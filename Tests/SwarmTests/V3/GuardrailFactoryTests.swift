@@ -2,8 +2,7 @@
 // SwarmTests
 //
 // TDD tests for V3 guardrail static factories on InputGuard/OutputGuard.
-// These tests verify the new factory API and that ClosureInputGuardrail/ClosureOutputGuardrail
-// are no longer part of the public API surface.
+// These tests verify the new factory API using InputGuard/OutputGuard.
 
 import Foundation
 @testable import Swarm

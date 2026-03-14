@@ -71,12 +71,12 @@ struct InputGuardrailTests {
         #expect(result.tripwireTriggered == false)
     }
 
-    // MARK: - ClosureInputGuardrail Tests
+    // MARK: - InputGuard Tests
 
-    @Test("ClosureInputGuardrail initializes with name and handler")
-    func closureInputGuardrailInitialization() {
+    @Test("InputGuard initializes with name and handler")
+    func inputGuardInitialization() {
         // When
-        let guardrail = ClosureInputGuardrail(name: "TestGuardrail") { _, _ in
+        let guardrail = InputGuard("TestGuardrail") { _, _ in
             .passed()
         }
 
@@ -84,10 +84,10 @@ struct InputGuardrailTests {
         #expect(guardrail.name == "TestGuardrail")
     }
 
-    @Test("ClosureInputGuardrail validates with passed result")
-    func closureInputGuardrailPassedResult() async throws {
+    @Test("InputGuard validates with passed result")
+    func inputGuardPassedResult() async throws {
         // Given
-        let guardrail = ClosureInputGuardrail(name: "PassGuardrail") { _, _ in
+        let guardrail = InputGuard("PassGuardrail") { _, _ in
             .passed(message: "Input is valid")
         }
 
@@ -99,10 +99,10 @@ struct InputGuardrailTests {
         #expect(result.message == "Input is valid")
     }
 
-    @Test("ClosureInputGuardrail validates with tripwire result")
-    func closureInputGuardrailTripwireResult() async throws {
+    @Test("InputGuard validates with tripwire result")
+    func inputGuardTripwireResult() async throws {
         // Given
-        let guardrail = ClosureInputGuardrail(name: "TripwireGuardrail") { _, _ in
+        let guardrail = InputGuard("TripwireGuardrail") { _, _ in
             .tripwire(message: "Sensitive data detected")
         }
 
@@ -114,8 +114,8 @@ struct InputGuardrailTests {
         #expect(result.message == "Sensitive data detected")
     }
 
-    @Test("ClosureInputGuardrail handler receives input")
-    func closureInputGuardrailReceivesInput() async throws {
+    @Test("InputGuard handler receives input")
+    func inputGuardReceivesInput() async throws {
         // Given
         actor InputCapture {
             var value: String?
@@ -124,7 +124,7 @@ struct InputGuardrailTests {
         }
 
         let capture = InputCapture()
-        let guardrail = ClosureInputGuardrail(name: "CaptureGuardrail") { input, _ in
+        let guardrail = InputGuard("CaptureGuardrail") { input, _ in
             await capture.set(input)
             return .passed()
         }
@@ -137,8 +137,8 @@ struct InputGuardrailTests {
         #expect(capturedInput == "test input")
     }
 
-    @Test("ClosureInputGuardrail handler receives context")
-    func closureInputGuardrailReceivesContext() async throws {
+    @Test("InputGuard handler receives context")
+    func inputGuardReceivesContext() async throws {
         // Given
         let testContext = AgentContext(input: "test")
         await testContext.set("customKey", value: .string("original"))
@@ -150,7 +150,7 @@ struct InputGuardrailTests {
         }
 
         let capture = ContextCapture()
-        let guardrail = ClosureInputGuardrail(name: "ContextGuardrail") { _, context in
+        let guardrail = InputGuard("ContextGuardrail") { _, context in
             await capture.set(context)
             return .passed()
         }
@@ -165,8 +165,8 @@ struct InputGuardrailTests {
         #expect(customValue?.stringValue == "original")
     }
 
-    @Test("ClosureInputGuardrail works with nil context")
-    func closureInputGuardrailWithNilContext() async throws {
+    @Test("InputGuard works with nil context")
+    func inputGuardWithNilContext() async throws {
         // Given
         actor ContextCapture {
             var value: AgentContext?
@@ -181,7 +181,7 @@ struct InputGuardrailTests {
         }
 
         let capture = ContextCapture()
-        let guardrail = ClosureInputGuardrail(name: "NilContextGuardrail") { _, context in
+        let guardrail = InputGuard("NilContextGuardrail") { _, context in
             await capture.set(context)
             return .passed()
         }
@@ -195,11 +195,11 @@ struct InputGuardrailTests {
         #expect(result.tripwireTriggered == false)
     }
 
-    @Test("ClosureInputGuardrail propagates errors from handler")
-    func closureInputGuardrailThrowsError() async {
+    @Test("InputGuard propagates errors from handler")
+    func inputGuardThrowsError() async {
         // Given
         struct TestError: Error {}
-        let guardrail = ClosureInputGuardrail(name: "ErrorGuardrail") { _, _ in
+        let guardrail = InputGuard("ErrorGuardrail") { _, _ in
             throw TestError()
         }
 
@@ -209,10 +209,10 @@ struct InputGuardrailTests {
         }
     }
 
-    @Test("ClosureInputGuardrail name property is accessible")
-    func closureInputGuardrailNameProperty() {
+    @Test("InputGuard name property is accessible")
+    func inputGuardNameProperty() {
         // Given
-        let guardrail = ClosureInputGuardrail(name: "NamedGuardrail") { _, _ in
+        let guardrail = InputGuard("NamedGuardrail") { _, _ in
             .passed()
         }
 
@@ -223,8 +223,8 @@ struct InputGuardrailTests {
         #expect(name == "NamedGuardrail")
     }
 
-    @Test("ClosureInputGuardrail supports concurrent validations")
-    func closureInputGuardrailConcurrentExecution() async throws {
+    @Test("InputGuard supports concurrent validations")
+    func inputGuardConcurrentExecution() async throws {
         // Given
         actor ValidationCounter {
             private var count = 0
@@ -233,7 +233,7 @@ struct InputGuardrailTests {
         }
 
         let counter = ValidationCounter()
-        let guardrail = ClosureInputGuardrail(name: "ConcurrentGuardrail") { _, _ in
+        let guardrail = InputGuard("ConcurrentGuardrail") { _, _ in
             await counter.increment()
             return .passed()
         }
@@ -254,15 +254,15 @@ struct InputGuardrailTests {
         #expect(finalCount == 10)
     }
 
-    @Test("ClosureInputGuardrail returns outputInfo from handler")
-    func closureInputGuardrailWithOutputInfo() async throws {
+    @Test("InputGuard returns outputInfo from handler")
+    func inputGuardWithOutputInfo() async throws {
         // Given
         let outputInfo: SendableValue = .dictionary([
             "tokensChecked": .int(42),
             "category": .string("safe")
         ])
 
-        let guardrail = ClosureInputGuardrail(name: "InfoGuardrail") { _, _ in
+        let guardrail = InputGuard("InfoGuardrail") { _, _ in
             .passed(outputInfo: outputInfo)
         }
 
@@ -273,15 +273,15 @@ struct InputGuardrailTests {
         #expect(result.outputInfo == outputInfo)
     }
 
-    @Test("ClosureInputGuardrail returns metadata from handler")
-    func closureInputGuardrailWithMetadata() async throws {
+    @Test("InputGuard returns metadata from handler")
+    func inputGuardWithMetadata() async throws {
         // Given
         let metadata: [String: SendableValue] = [
             "duration": .double(0.123),
             "version": .string("1.0")
         ]
 
-        let guardrail = ClosureInputGuardrail(name: "MetadataGuardrail") { _, _ in
+        let guardrail = InputGuard("MetadataGuardrail") { _, _ in
             .passed(metadata: metadata)
         }
 
@@ -292,107 +292,55 @@ struct InputGuardrailTests {
         #expect(result.metadata == metadata)
     }
 
-    // MARK: - InputGuardrailBuilder Tests
+    // MARK: - InputGuard Direct Construction Tests
 
-    @Test("InputGuardrailBuilder builds with name and handler")
-    func inputGuardrailBuilderBasic() throws {
+    @Test("InputGuard direct construction with name and handler")
+    func inputGuardDirectConstructionBasic() throws {
         // When
-        let guardrail = InputGuardrailBuilder()
-            .name("TestGuardrail")
-            .validate { _, _ in
-                .passed()
-            }
-            .build()
+        let guardrail = InputGuard("TestGuardrail") { _, _ in
+            .passed()
+        }
 
         // Then
         #expect(guardrail.name == "TestGuardrail")
     }
 
-    @Test("InputGuardrailBuilder supports fluent chaining")
-    func inputGuardrailBuilderFluentChaining() throws {
+    @Test("InputGuard creates correct type")
+    func inputGuardCreatesCorrectType() throws {
         // When
-        let builder1 = InputGuardrailBuilder()
-        let builder2 = builder1.name("Test")
-        let builder3 = builder2.validate { _, _ in .passed() }
-        let guardrail = builder3.build()
+        let guardrail = InputGuard("TypeTest") { _, _ in .passed() }
 
         // Then
-        #expect(guardrail.name == "Test")
-    }
-
-    @Test("InputGuardrailBuilder creates ClosureInputGuardrail")
-    func inputGuardrailBuilderCreatesCorrectType() throws {
-        // When
-        let guardrail = InputGuardrailBuilder()
-            .name("TypeTest")
-            .validate { _, _ in .passed() }
-            .build()
-
-        // Then
-        #expect(guardrail is ClosureInputGuardrail)
+        #expect(guardrail is InputGuard)
         #expect(guardrail is any InputGuardrail)
     }
 
-    @Test("InputGuardrailBuilder preserves name")
-    func inputGuardrailBuilderPreservesName() throws {
+    @Test("InputGuard preserves name")
+    func inputGuardPreservesName() throws {
         // Given
         let expectedName = "PreservedName"
 
         // When
-        let guardrail = InputGuardrailBuilder()
-            .name(expectedName)
-            .validate { _, _ in .passed() }
-            .build()
+        let guardrail = InputGuard(expectedName) { _, _ in .passed() }
 
         // Then
         #expect(guardrail.name == expectedName)
     }
 
-    @Test("InputGuardrailBuilder preserves handler")
-    func inputGuardrailBuilderPreservesHandler() async throws {
+    @Test("InputGuard preserves handler")
+    func inputGuardPreservesHandler() async throws {
         // Given
         let expectedMessage = "Handler preserved"
 
         // When
-        let guardrail = InputGuardrailBuilder()
-            .name("Test")
-            .validate { _, _ in
-                .passed(message: expectedMessage)
-            }
-            .build()
+        let guardrail = InputGuard("Test") { _, _ in
+            .passed(message: expectedMessage)
+        }
 
         let result = try await guardrail.validate("test", context: nil)
 
         // Then
         #expect(result.message == expectedMessage)
-    }
-
-    @Test("InputGuardrailBuilder allows multiple names with last winning")
-    func inputGuardrailBuilderMultipleNames() throws {
-        // When
-        let guardrail = InputGuardrailBuilder()
-            .name("FirstName")
-            .name("SecondName")
-            .validate { _, _ in .passed() }
-            .build()
-
-        // Then
-        #expect(guardrail.name == "SecondName")
-    }
-
-    @Test("InputGuardrailBuilder allows multiple handlers with last winning")
-    func inputGuardrailBuilderMultipleHandlers() async throws {
-        // When
-        let guardrail = InputGuardrailBuilder()
-            .name("Test")
-            .validate { _, _ in .passed(message: "First") }
-            .validate { _, _ in .passed(message: "Second") }
-            .build()
-
-        let result = try await guardrail.validate("test", context: nil)
-
-        // Then
-        #expect(result.message == "Second")
     }
 
     // MARK: - Integration Tests
@@ -408,17 +356,17 @@ struct InputGuardrailTests {
 
         let executionOrder = ExecutionOrder()
 
-        let guardrail1 = ClosureInputGuardrail(name: "First") { _, _ in
+        let guardrail1 = InputGuard("First") { _, _ in
             await executionOrder.append("First")
             return .passed()
         }
 
-        let guardrail2 = ClosureInputGuardrail(name: "Second") { _, _ in
+        let guardrail2 = InputGuard("Second") { _, _ in
             await executionOrder.append("Second")
             return .passed()
         }
 
-        let guardrail3 = ClosureInputGuardrail(name: "Third") { _, _ in
+        let guardrail3 = InputGuard("Third") { _, _ in
             await executionOrder.append("Third")
             return .passed()
         }
@@ -438,7 +386,7 @@ struct InputGuardrailTests {
         // Given
         let context = AgentContext(input: "test input")
 
-        let guardrail = ClosureInputGuardrail(name: "ContextGuardrail") { _, context in
+        let guardrail = InputGuard("ContextGuardrail") { _, context in
             guard let ctx = context else {
                 return .tripwire(message: "No context provided")
             }
@@ -462,7 +410,7 @@ struct InputGuardrailTests {
     @Test("Guardrail is Sendable in TaskGroup")
     func guardrailSendableInTaskGroup() async throws {
         // Given
-        let guardrail = ClosureInputGuardrail(name: "TaskGroupGuardrail") { input, _ in
+        let guardrail = InputGuard("TaskGroupGuardrail") { input, _ in
             .passed(message: "Validated: \(input)")
         }
 
@@ -508,10 +456,10 @@ struct InputGuardrailTests {
 
         let store = GuardrailStore()
 
-        let guardrail1 = ClosureInputGuardrail(name: "Guard1") { _, _ in
+        let guardrail1 = InputGuard("Guard1") { _, _ in
             .passed()
         }
-        let guardrail2 = ClosureInputGuardrail(name: "Guard2") { _, _ in
+        let guardrail2 = InputGuard("Guard2") { _, _ in
             .passed()
         }
 
@@ -527,8 +475,8 @@ struct InputGuardrailTests {
 
     // MARK: - Edge Cases
 
-    @Test("ClosureInputGuardrail handles empty input")
-    func closureInputGuardrailEmptyInput() async throws {
+    @Test("InputGuard handles empty input")
+    func inputGuardEmptyInput() async throws {
         // Given
         actor InputCapture {
             var value: String?
@@ -537,7 +485,7 @@ struct InputGuardrailTests {
         }
 
         let capture = InputCapture()
-        let guardrail = ClosureInputGuardrail(name: "EmptyInputGuardrail") { input, _ in
+        let guardrail = InputGuard("EmptyInputGuardrail") { input, _ in
             await capture.set(input)
             return input.isEmpty ? .tripwire(message: "Empty input") : .passed()
         }
@@ -552,11 +500,11 @@ struct InputGuardrailTests {
         #expect(result.message == "Empty input")
     }
 
-    @Test("ClosureInputGuardrail handles very long input")
-    func closureInputGuardrailLongInput() async throws {
+    @Test("InputGuard handles very long input")
+    func inputGuardLongInput() async throws {
         // Given
         let longInput = String(repeating: "a", count: 10000)
-        let guardrail = ClosureInputGuardrail(name: "LongInputGuardrail") { input, _ in
+        let guardrail = InputGuard("LongInputGuardrail") { input, _ in
             .passed(message: "Length: \(input.count)")
         }
 
@@ -568,8 +516,8 @@ struct InputGuardrailTests {
         #expect(result.message == "Length: 10000")
     }
 
-    @Test("ClosureInputGuardrail handles special characters in input")
-    func closureInputGuardrailSpecialCharacters() async throws {
+    @Test("InputGuard handles special characters in input")
+    func inputGuardSpecialCharacters() async throws {
         // Given
         let specialInput = "Test with émojis 🎉 and symbols !@#$%^&*()"
 
@@ -580,7 +528,7 @@ struct InputGuardrailTests {
         }
 
         let capture = InputCapture()
-        let guardrail = ClosureInputGuardrail(name: "SpecialCharGuardrail") { input, _ in
+        let guardrail = InputGuard("SpecialCharGuardrail") { input, _ in
             await capture.set(input)
             return .passed()
         }

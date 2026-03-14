@@ -57,7 +57,7 @@ fileprivate actor MockGuardrailAgent: Agent {
 func testAgentWithInputGuardrailPassed() async throws {
     // Given: Setup agent and guardrail
     let agent = await MockGuardrailAgent(...)
-    let inputGuardrail = ClosureInputGuardrail(...)
+    let inputGuardrail = InputGuard(...)
     
     // When: Execute guardrail
     let results = try await runner.runInputGuardrails(...)
@@ -150,8 +150,8 @@ if role != "admin" {
 - ⏳ `OutputGuardrail` - Protocol and implementations
 - ⏳ `ToolInputGuardrail` - Protocol and implementations
 - ⏳ `ToolOutputGuardrail` - Protocol and implementations
-- ⏳ `ClosureInputGuardrail` - Closure-based implementation
-- ⏳ `ClosureOutputGuardrail` - Closure-based implementation
+- ⏳ `InputGuard` - Closure-based implementation
+- ⏳ `OutputGuard` - Closure-based implementation
 - ⏳ `ClosureToolInputGuardrail` - Tool input validation
 - ⏳ `ClosureToolOutputGuardrail` - Tool output validation
 - ⏳ `ToolGuardrailData` - Tool guardrail data struct
@@ -205,7 +205,7 @@ swift test --filter GuardrailIntegrationTests --verbose
 - Use `MockGuardrailAgent` for agent behavior
 - Use `MockTool` from existing mocks
 - Use `MockInferenceProvider` for LLM simulation
-- Create custom guardrails inline with `ClosureInputGuardrail`
+- Create custom guardrails inline with `InputGuard`
 
 ### Concurrency Safety
 - All agents are actors (thread-safe)

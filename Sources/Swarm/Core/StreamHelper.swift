@@ -70,9 +70,9 @@ public enum StreamHelper {
     /// ```swift
     /// func stream(_ input: String) -> AsyncThrowingStream<AgentEvent, Error> {
     ///     StreamHelper.makeTrackedStream { continuation in
-    ///         continuation.yield(.started(input: input))
+    ///         continuation.yield(.lifecycle(.started(input: input)))
     ///         let result = try await self.run(input)
-    ///         continuation.yield(.completed(result: result))
+    ///         continuation.yield(.lifecycle(.completed(result: result)))
     ///         continuation.finish()  // REQUIRED - don't forget!
     ///     }
     /// }

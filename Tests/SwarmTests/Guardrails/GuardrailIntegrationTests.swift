@@ -74,7 +74,7 @@ struct GuardrailIntegrationTests {
         )
 
         // Input guardrail that always passes
-        let inputGuardrail = ClosureInputGuardrail(name: "always_pass") { _, _ in
+        let inputGuardrail = InputGuard("always_pass") { _, _ in
             .passed(message: "Input validation successful")
         }
 
@@ -103,7 +103,7 @@ struct GuardrailIntegrationTests {
         let agent = await MockGuardrailAgent(name: "TestAgent")
 
         // Input guardrail that triggers on sensitive content
-        let inputGuardrail = ClosureInputGuardrail(name: "sensitive_data_blocker") { input, _ in
+        let inputGuardrail = InputGuard("sensitive_data_blocker") { input, _ in
             if input.contains("SSN:") || input.contains("password") {
                 return .tripwire(
                     message: "Sensitive data detected in input",
@@ -155,7 +155,7 @@ struct GuardrailIntegrationTests {
 
         let tracker = ExecutionTracker()
 
-        let guardrail1 = ClosureInputGuardrail(name: "length_check") { input, _ in
+        let guardrail1 = InputGuard("length_check") { input, _ in
             await tracker.append("length_check")
             if input.count < 5 {
                 return .tripwire(message: "Input too short")
@@ -163,7 +163,7 @@ struct GuardrailIntegrationTests {
             return .passed()
         }
 
-        let guardrail2 = ClosureInputGuardrail(name: "format_check") { input, _ in
+        let guardrail2 = InputGuard("format_check") { input, _ in
             await tracker.append("format_check")
             if !input.contains("?") {
                 return .tripwire(message: "Input must be a question")
@@ -199,7 +199,7 @@ struct GuardrailIntegrationTests {
             responseHandler: { _ in "Safe output content" }
         )
 
-        let outputGuardrail = ClosureOutputGuardrail(name: "output_validator") { output, _, _ in
+        let outputGuardrail = OutputGuard("output_validator") { output, _, _ in
             if output.contains("Safe") {
                 return .passed(message: "Output validated successfully")
             }
@@ -232,7 +232,7 @@ struct GuardrailIntegrationTests {
             responseHandler: { _ in "This content contains profanity: damn" }
         )
 
-        let outputGuardrail = ClosureOutputGuardrail(name: "profanity_filter") { output, _, _ in
+        let outputGuardrail = OutputGuard("profanity_filter") { output, _, _ in
             let profaneWords = ["damn", "hell", "crap"]
             let containsProfanity = profaneWords.contains { output.lowercased().contains($0) }
 
@@ -409,14 +409,14 @@ extension GuardrailIntegrationTests {
             }
         )
 
-        let inputGuardrail = ClosureInputGuardrail(name: "input_sanitizer") { input, _ in
+        let inputGuardrail = InputGuard("input_sanitizer") { input, _ in
             if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 return .tripwire(message: "Empty input not allowed")
             }
             return .passed(message: "Input accepted")
         }
 
-        let outputGuardrail = ClosureOutputGuardrail(name: "output_length_checker") { output, _, _ in
+        let outputGuardrail = OutputGuard("output_length_checker") { output, _, _ in
             if output.count > 1000 {
                 return .tripwire(
                     message: "Output too long",
@@ -469,7 +469,7 @@ extension GuardrailIntegrationTests {
             func get() -> AgentContext? { value }
         }
         let contextCapture = ContextCapture()
-        let inputGuardrail = ClosureInputGuardrail(name: "role_checker") { _, ctx in
+        let inputGuardrail = InputGuard("role_checker") { _, ctx in
             await contextCapture.set(ctx)
 
             // Check user role from context
@@ -508,7 +508,7 @@ extension GuardrailIntegrationTests {
         let agent = await MockGuardrailAgent(name: "ErrorAgent")
         let context = AgentContext(input: "Test")
 
-        let inputGuardrail = ClosureInputGuardrail(name: "error_trigger") { _, _ in
+        let inputGuardrail = InputGuard("error_trigger") { _, _ in
             .tripwire(
                 message: "Test error message",
                 outputInfo: .dictionary([
@@ -583,7 +583,7 @@ extension GuardrailIntegrationTests {
         let agent = await MockGuardrailAgent(name: "MetadataAgent")
         let context = AgentContext(input: "Test")
 
-        let inputGuardrail = ClosureInputGuardrail(name: "metadata_setter") { input, _ in
+        let inputGuardrail = InputGuard("metadata_setter") { input, _ in
             .passed(
                 message: "Validation passed with metadata",
                 metadata: [
@@ -645,7 +645,7 @@ extension GuardrailIntegrationTests {
 
         let tracker = IntervalTracker()
 
-        let slowGuardrail1 = ClosureInputGuardrail(name: "slow1") { _, _ in
+        let slowGuardrail1 = InputGuard("slow1") { _, _ in
             let start = ContinuousClock.now
             try? await Task.sleep(for: .milliseconds(200))
             let end = ContinuousClock.now
@@ -653,7 +653,7 @@ extension GuardrailIntegrationTests {
             return .passed(message: "Slow check 1 complete")
         }
 
-        let slowGuardrail2 = ClosureInputGuardrail(name: "slow2") { _, _ in
+        let slowGuardrail2 = InputGuard("slow2") { _, _ in
             let start = ContinuousClock.now
             try? await Task.sleep(for: .milliseconds(200))
             let end = ContinuousClock.now

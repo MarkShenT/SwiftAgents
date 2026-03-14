@@ -59,8 +59,8 @@ private struct LocalConstantAgent: AgentRuntime {
         observer: (any AgentObserver)?
     ) -> AsyncThrowingStream<AgentEvent, Error> {
         StreamHelper.makeTrackedStream { continuation in
-            continuation.yield(.started(input: input))
-            continuation.yield(.completed(result: AgentResult(output: self.output)))
+            continuation.yield(.lifecycle(.started(input: input)))
+            continuation.yield(.lifecycle(.completed(result: AgentResult(output: self.output))))
             continuation.finish()
         }
     }

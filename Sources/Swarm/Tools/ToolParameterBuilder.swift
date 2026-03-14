@@ -306,7 +306,3 @@ public struct ToolBuilder {
         component
     }
 }
-
-/// Deprecated: Use ``ToolBuilder`` instead.
-@available(*, deprecated, renamed: "ToolBuilder")
-public typealias ToolArrayBuilder = ToolBuilder

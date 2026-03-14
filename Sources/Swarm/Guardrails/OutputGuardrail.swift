@@ -108,33 +108,6 @@ public protocol OutputGuardrail: Guardrail {
 ///     return .passed()
 /// }
 /// ```
-@available(*, deprecated, message: "Use OutputGuard(\"name\") { output in ... } instead. ClosureOutputGuardrail is superseded by the V3 API.")
-struct ClosureOutputGuardrail: OutputGuardrail, Sendable {
-    /// The name of this guardrail.
-    let name: String
-
-    /// Creates a closure-based output guardrail.
-    ///
-    /// - Parameters:
-    ///   - name: The name of this guardrail for identification.
-    ///   - handler: The validation closure that receives output, agent, and context.
-    init(
-        name: String,
-        handler: @escaping @Sendable (String, any AgentRuntime, AgentContext?) async throws -> GuardrailResult
-    ) {
-        self.name = name
-        self.handler = handler
-    }
-
-    /// Validates the agent output by calling the handler closure.
-    func validate(_ output: String, agent: any AgentRuntime, context: AgentContext?) async throws -> GuardrailResult {
-        try await handler(output, agent, context)
-    }
-
-    /// The validation handler closure.
-    private let handler: @Sendable (String, any AgentRuntime, AgentContext?) async throws -> GuardrailResult
-}
-
 // MARK: - OutputGuard
 
 /// A lightweight, closure-based `OutputGuardrail` with a concise API.
@@ -190,105 +163,6 @@ public struct OutputGuard: OutputGuardrail, Sendable {
     }
 
     private let handler: OutputValidationHandler
-}
-
-// MARK: - OutputGuardrailBuilder
-
-/// Builder for creating `ClosureOutputGuardrail` instances with a fluent interface.
-///
-/// `OutputGuardrailBuilder` provides a chainable API for configuring output guardrails.
-/// This builder pattern allows for clear, readable guardrail construction.
-///
-/// Example:
-/// ```swift
-/// let guardrail = OutputGuardrailBuilder()
-///     .name("ContentFilter")
-///     .validate { output, agent, context in
-///         if output.isEmpty {
-///             return .tripwire(message: "Empty output not allowed")
-///         }
-///         return .passed()
-///     }
-///     .build()
-/// ```
-///
-/// The builder supports:
-/// - Multiple calls to `.name()` - the last value wins
-/// - Multiple calls to `.validate()` - the last handler wins
-/// - Fluent chaining for readability
-struct OutputGuardrailBuilder: Sendable {
-    // MARK: Internal
-
-    // MARK: - Initialization
-
-    /// Creates a new builder instance.
-    init() {
-        currentName = nil
-        currentHandler = nil
-    }
-
-    // MARK: - Builder Methods
-
-    /// Sets the name for the guardrail.
-    @discardableResult
-    func name(_ name: String) -> OutputGuardrailBuilder {
-        OutputGuardrailBuilder(name: name, handler: currentHandler)
-    }
-
-    /// Sets the validation handler for the guardrail.
-    @discardableResult
-    func validate(
-        _ handler: @escaping @Sendable (String, any AgentRuntime, AgentContext?) async throws -> GuardrailResult
-    ) -> OutputGuardrailBuilder {
-        OutputGuardrailBuilder(name: currentName, handler: handler)
-    }
-
-    // MARK: - Build
-
-    /// Builds the final `ClosureOutputGuardrail` instance.
-    func build() -> ClosureOutputGuardrail {
-        let finalName = currentName ?? "UnnamedOutputGuardrail"
-        let finalHandler = currentHandler ?? { _, _, _ in .passed() }
-
-        return ClosureOutputGuardrail(name: finalName, handler: finalHandler)
-    }
-
-    // MARK: Private
-
-    // MARK: - Private Properties
-
-    /// The current name being built.
-    private let currentName: String?
-
-    /// The current validation handler being built.
-    private let currentHandler: (@Sendable (String, any AgentRuntime, AgentContext?) async throws -> GuardrailResult)?
-
-    /// Private initializer for builder chaining.
-    private init(
-        name: String?,
-        handler: (@Sendable (String, any AgentRuntime, AgentContext?) async throws -> GuardrailResult)?
-    ) {
-        currentName = name
-        currentHandler = handler
-    }
-}
-
-// MARK: - Convenience Factories (Internal — legacy)
-
-@available(*, deprecated, message: "Use OutputGuard(\"name\") { output in ... } instead. ClosureOutputGuardrail is superseded by the V3 API.")
-extension ClosureOutputGuardrail {
-    /// Creates a guardrail that checks output length.
-    static func maxLength(_ maxLength: Int, name: String = "MaxOutputLengthGuardrail") -> ClosureOutputGuardrail {
-        ClosureOutputGuardrail(name: name) { output, _, _ in
-            if output.count > maxLength {
-                return .tripwire(
-                    message: "Output exceeds maximum length of \(maxLength)",
-                    metadata: ["length": .int(output.count), "limit": .int(maxLength)]
-                )
-            }
-            return .passed()
-        }
-    }
 }
 
 // MARK: - OutputGuard Static Factories

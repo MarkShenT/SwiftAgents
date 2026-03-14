@@ -71,9 +71,9 @@ public actor MockAgentRuntime: AgentRuntime {
 
     public nonisolated func stream(_ input: String, session: (any Session)?, observer: (any AgentObserver)?) -> AsyncThrowingStream<AgentEvent, Error> {
         StreamHelper.makeTrackedStream { continuation in
-            continuation.yield(.started(input: input))
+            continuation.yield(.lifecycle(.started(input: input)))
             if self.streamTokens.isEmpty {
-                continuation.yield(.completed(result: AgentResult(output: self.response ?? "")))
+                continuation.yield(.lifecycle(.completed(result: AgentResult(output: self.response ?? ""))))
                 continuation.finish()
                 return
             }
@@ -81,10 +81,10 @@ public actor MockAgentRuntime: AgentRuntime {
             var aggregate = ""
             for token in self.streamTokens {
                 aggregate += token
-                continuation.yield(.outputToken(token: token))
+                continuation.yield(.output(.token(token)))
             }
 
-            continuation.yield(.completed(result: AgentResult(output: aggregate)))
+            continuation.yield(.lifecycle(.completed(result: AgentResult(output: aggregate))))
             continuation.finish()
         }
     }

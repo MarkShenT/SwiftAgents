@@ -47,7 +47,7 @@
 func testSomething() async throws {
     // Given: Setup
     let agent = await MockGuardrailAgent(...)
-    let guardrail = ClosureInputGuardrail(...)
+    let guardrail = InputGuard(...)
     
     // When: Execute
     let results = try await runner.runInputGuardrails(...)
@@ -69,7 +69,7 @@ let agent = await MockGuardrailAgent(
 
 ### Guardrail Creation
 ```swift
-let inputGuardrail = ClosureInputGuardrail(name: "validator") { input, agent, ctx in
+let inputGuardrail = InputGuard(name: "validator") { input, agent, ctx in
     if someCondition {
         return .tripwire(message: "Failed", outputInfo: .string("details"))
     }

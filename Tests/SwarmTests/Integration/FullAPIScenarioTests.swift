@@ -107,7 +107,7 @@ struct FullAPIScenarioTests {
     func guardrails() async throws {
         let mock = MockInferenceProvider()
         await mock.setResponses(["ok"])
-        let guardrail = ClosureInputGuardrail(name: "always_trip") { _, _ in
+        let guardrail = InputGuard("always_trip") { _, _ in
             GuardrailResult(tripwireTriggered: true, message: "blocked")
         }
         let agent = try Agent(instructions: "Service", inferenceProvider: mock, inputGuardrails: [guardrail])

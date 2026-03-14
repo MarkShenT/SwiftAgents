@@ -50,7 +50,7 @@ struct MockAgent: AgentRuntime {
 
     nonisolated func stream(_ input: String, session _: (any Session)? = nil, observer _: (any AgentObserver)? = nil) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
-            continuation.yield(.started(input: input))
+            continuation.yield(.lifecycle(.started(input: input)))
             continuation.finish()
         }
     }
@@ -67,7 +67,7 @@ struct OutputGuardrailTests {
     @Test("OutputGuardrail protocol requires name property")
     func protocolRequiresName() async throws {
         // Given
-        let guardrail = ClosureOutputGuardrail(name: "test_guardrail") { _, _, _ in
+        let guardrail = OutputGuard("test_guardrail") { _, _, _ in
             .passed()
         }
 
@@ -79,7 +79,7 @@ struct OutputGuardrailTests {
     func protocolRequiresValidateMethod() async throws {
         // Given
         let agent = MockAgent()
-        let guardrail = ClosureOutputGuardrail(name: "test") { output, _, _ in
+        let guardrail = OutputGuard("test") { output, _, _ in
             #expect(output == "test output")
             return .passed()
         }
@@ -91,19 +91,19 @@ struct OutputGuardrailTests {
         #expect(result.tripwireTriggered == false)
     }
 
-    // MARK: - ClosureOutputGuardrail Basic Tests
+    // MARK: - OutputGuard Basic Tests
 
-    @Test("ClosureOutputGuardrail stores name correctly")
+    @Test("OutputGuard stores name correctly")
     func closureGuardrailName() {
         // Given
         let name = "content_filter"
-        let guardrail = ClosureOutputGuardrail(name: name) { _, _, _ in .passed() }
+        let guardrail = OutputGuard(name) { _, _, _ in .passed() }
 
         // Then
         #expect(guardrail.name == name)
     }
 
-    @Test("ClosureOutputGuardrail executes handler on validate")
+    @Test("OutputGuardexecutes handler on validate")
     func closureGuardrailExecutesHandler() async throws {
         // Given
         actor CallCapture {
@@ -112,7 +112,7 @@ struct OutputGuardrailTests {
             func get() -> Bool { called }
         }
         let capture = CallCapture()
-        let guardrail = ClosureOutputGuardrail(name: "test") { _, _, _ in
+        let guardrail = OutputGuard("test") { _, _, _ in
             await capture.set()
             return .passed()
         }
@@ -128,10 +128,10 @@ struct OutputGuardrailTests {
 
     // MARK: - Passed Result Tests
 
-    @Test("ClosureOutputGuardrail returns passed result")
+    @Test("OutputGuardreturns passed result")
     func closureGuardrailPassedResult() async throws {
         // Given
-        let guardrail = ClosureOutputGuardrail(name: "allow_all") { _, _, _ in
+        let guardrail = OutputGuard("allow_all") { _, _, _ in
             .passed(message: "Content is safe")
         }
         let agent = MockAgent()
@@ -144,11 +144,11 @@ struct OutputGuardrailTests {
         #expect(result.message == "Content is safe")
     }
 
-    @Test("ClosureOutputGuardrail passes output to handler")
+    @Test("OutputGuardpasses output to handler")
     func closureGuardrailReceivesOutput() async throws {
         // Given
         let expectedOutput = "This is the output to validate"
-        let guardrail = ClosureOutputGuardrail(name: "validator") { output, _, _ in
+        let guardrail = OutputGuard("validator") { output, _, _ in
             #expect(output == expectedOutput)
             return .passed()
         }
@@ -160,10 +160,10 @@ struct OutputGuardrailTests {
 
     // MARK: - Tripwire Result Tests
 
-    @Test("ClosureOutputGuardrail returns tripwire result")
+    @Test("OutputGuardreturns tripwire result")
     func closureGuardrailTripwireResult() async throws {
         // Given
-        let guardrail = ClosureOutputGuardrail(name: "block_profanity") { output, _, _ in
+        let guardrail = OutputGuard("block_profanity") { output, _, _ in
             if output.contains("badword") {
                 return .tripwire(
                     message: "Profanity detected",
@@ -183,7 +183,7 @@ struct OutputGuardrailTests {
         #expect(result.outputInfo != nil)
     }
 
-    @Test("ClosureOutputGuardrail tripwire result includes outputInfo")
+    @Test("OutputGuardtripwire result includes outputInfo")
     func closureGuardrailTripwireOutputInfo() async throws {
         // Given
         let violationInfo: SendableValue = .dictionary([
@@ -191,7 +191,7 @@ struct OutputGuardrailTests {
             "patterns": .array([.string("SSN"), .string("CREDIT_CARD")])
         ])
 
-        let guardrail = ClosureOutputGuardrail(name: "pii_detector") { _, _, _ in
+        let guardrail = OutputGuard("pii_detector") { _, _, _ in
             .tripwire(message: "PII detected", outputInfo: violationInfo)
         }
         let agent = MockAgent()
@@ -206,13 +206,13 @@ struct OutputGuardrailTests {
 
     // MARK: - Agent Parameter Tests
 
-    @Test("ClosureOutputGuardrail receives agent parameter")
+    @Test("OutputGuardreceives agent parameter")
     func closureGuardrailWithAgent() async throws {
         // Given
         let expectedInstructions = "Test agent instructions"
         let agent = MockAgent(instructions: expectedInstructions)
 
-        let guardrail = ClosureOutputGuardrail(name: "agent_checker") { _, receivedAgent, _ in
+        let guardrail = OutputGuard("agent_checker") { _, receivedAgent, _ in
             #expect(receivedAgent.instructions == expectedInstructions)
             return .passed()
         }
@@ -221,13 +221,13 @@ struct OutputGuardrailTests {
         _ = try await guardrail.validate("output", agent: agent, context: nil)
     }
 
-    @Test("ClosureOutputGuardrail can access agent configuration")
+    @Test("OutputGuardcan access agent configuration")
     func closureGuardrailAccessesAgentConfig() async throws {
         // Given
         let config = AgentConfiguration.default.maxIterations(10)
         let agent = MockAgent(configuration: config)
 
-        let guardrail = ClosureOutputGuardrail(name: "config_checker") { _, receivedAgent, _ in
+        let guardrail = OutputGuard("config_checker") { _, receivedAgent, _ in
             #expect(receivedAgent.configuration.maxIterations == 10)
             return .passed()
         }
@@ -236,13 +236,13 @@ struct OutputGuardrailTests {
         _ = try await guardrail.validate("output", agent: agent, context: nil)
     }
 
-    @Test("ClosureOutputGuardrail can access agent tools")
+    @Test("OutputGuardcan access agent tools")
     func closureGuardrailAccessesAgentTools() async throws {
         // Given
         let tool = MockTool(name: "calculator")
         let agent = MockAgent(tools: [tool])
 
-        let guardrail = ClosureOutputGuardrail(name: "tool_checker") { _, receivedAgent, _ in
+        let guardrail = OutputGuard("tool_checker") { _, receivedAgent, _ in
             #expect(receivedAgent.tools.count == 1)
             #expect(receivedAgent.tools[0].name == "calculator")
             return .passed()
@@ -254,10 +254,10 @@ struct OutputGuardrailTests {
 
     // MARK: - Context Parameter Tests
 
-    @Test("ClosureOutputGuardrail receives nil context when not provided")
+    @Test("OutputGuardreceives nil context when not provided")
     func closureGuardrailWithNilContext() async throws {
         // Given
-        let guardrail = ClosureOutputGuardrail(name: "context_checker") { _, _, context in
+        let guardrail = OutputGuard("context_checker") { _, _, context in
             #expect(context == nil)
             return .passed()
         }
@@ -267,13 +267,13 @@ struct OutputGuardrailTests {
         _ = try await guardrail.validate("output", agent: agent, context: nil)
     }
 
-    @Test("ClosureOutputGuardrail receives context when provided")
+    @Test("OutputGuardreceives context when provided")
     func closureGuardrailWithContext() async throws {
         // Given
         let context = AgentContext(input: "Original query")
         await context.set("custom_key", value: .string("custom_value"))
 
-        let guardrail = ClosureOutputGuardrail(name: "context_reader") { _, _, receivedContext in
+        let guardrail = OutputGuard("context_reader") { _, _, receivedContext in
             #expect(receivedContext != nil)
             return .passed()
         }
@@ -283,13 +283,13 @@ struct OutputGuardrailTests {
         _ = try await guardrail.validate("output", agent: agent, context: context)
     }
 
-    @Test("ClosureOutputGuardrail can read context values")
+    @Test("OutputGuardcan read context values")
     func closureGuardrailReadsContextValues() async throws {
         // Given
         let context = AgentContext(input: "Test input")
         await context.set("validation_mode", value: .string("strict"))
 
-        let guardrail = ClosureOutputGuardrail(name: "context_validator") { _, _, ctx in
+        let guardrail = OutputGuard("context_validator") { _, _, ctx in
             Task {
                 if let mode = await ctx?.get("validation_mode")?.stringValue {
                     #expect(mode == "strict")
@@ -305,11 +305,11 @@ struct OutputGuardrailTests {
 
     // MARK: - Error Handling Tests
 
-    @Test("ClosureOutputGuardrail propagates thrown errors")
+    @Test("OutputGuardpropagates thrown errors")
     func closureGuardrailThrowsError() async {
         // Given
         struct TestError: Error, Equatable {}
-        let guardrail = ClosureOutputGuardrail(name: "error_thrower") { _, _, _ in
+        let guardrail = OutputGuard("error_thrower") { _, _, _ in
             throw TestError()
         }
         let agent = MockAgent()
@@ -325,10 +325,10 @@ struct OutputGuardrailTests {
         }
     }
 
-    @Test("ClosureOutputGuardrail handles async errors")
+    @Test("OutputGuardhandles async errors")
     func closureGuardrailAsyncError() async {
         // Given
-        let guardrail = ClosureOutputGuardrail(name: "async_error") { _, _, _ in
+        let guardrail = OutputGuard("async_error") { _, _, _ in
             try await Task.sleep(for: .milliseconds(1))
             throw AgentError.internalError(reason: "Async failure")
         }
@@ -356,7 +356,7 @@ struct OutputGuardrailTests {
     @Test("OutputGuardrail is Sendable across async boundaries")
     func outputGuardrailSendable() async throws {
         // Given
-        let guardrail = ClosureOutputGuardrail(name: "sendable_test") { _, _, _ in
+        let guardrail = OutputGuard("sendable_test") { _, _, _ in
             .passed(message: "Sent across boundary")
         }
 
@@ -377,7 +377,7 @@ struct OutputGuardrailTests {
     @Test("OutputGuardrail can be used in Task context")
     func outputGuardrailInTask() async throws {
         // Given
-        let guardrail = ClosureOutputGuardrail(name: "task_test") { _, _, _ in
+        let guardrail = OutputGuard("task_test") { _, _, _ in
             .passed()
         }
         let agent = MockAgent()
@@ -407,7 +407,7 @@ struct OutputGuardrailTests {
         }
 
         let store = GuardrailStore()
-        let guardrail = ClosureOutputGuardrail(name: "stored") { _, _, _ in .passed() }
+        let guardrail = OutputGuard("stored") { _, _, _ in .passed() }
 
         // When
         await store.store(guardrail)
@@ -427,14 +427,14 @@ extension OutputGuardrailTests {
     @Test("Multiple OutputGuardrails can be composed")
     func multipleOutputGuardrails() async throws {
         // Given
-        let guardrail1 = ClosureOutputGuardrail(name: "length_check") { output, _, _ in
+        let guardrail1 = OutputGuard("length_check") { output, _, _ in
             if output.count < 10 {
                 return .tripwire(message: "Output too short")
             }
             return .passed()
         }
 
-        let guardrail2 = ClosureOutputGuardrail(name: "content_check") { output, _, _ in
+        let guardrail2 = OutputGuard("content_check") { output, _, _ in
             if output.contains("forbidden") {
                 return .tripwire(message: "Forbidden content")
             }
@@ -485,17 +485,17 @@ extension OutputGuardrailTests {
         }
         let orderCapture = OrderCapture()
 
-        let guardrail1 = ClosureOutputGuardrail(name: "first") { _, _, _ in
+        let guardrail1 = OutputGuard("first") { _, _, _ in
             await orderCapture.append("first")
             return .passed()
         }
 
-        let guardrail2 = ClosureOutputGuardrail(name: "second") { _, _, _ in
+        let guardrail2 = OutputGuard("second") { _, _, _ in
             await orderCapture.append("second")
             return .passed()
         }
 
-        let guardrail3 = ClosureOutputGuardrail(name: "third") { _, _, _ in
+        let guardrail3 = OutputGuard("third") { _, _, _ in
             await orderCapture.append("third")
             return .passed()
         }
@@ -523,17 +523,17 @@ extension OutputGuardrailTests {
         }
         let logCapture = LogCapture()
 
-        let guardrail1 = ClosureOutputGuardrail(name: "first") { _, _, _ in
+        let guardrail1 = OutputGuard("first") { _, _, _ in
             await logCapture.append("first")
             return .passed()
         }
 
-        let guardrail2 = ClosureOutputGuardrail(name: "second") { _, _, _ in
+        let guardrail2 = OutputGuard("second") { _, _, _ in
             await logCapture.append("second")
             return .tripwire(message: "Second guardrail blocks")
         }
 
-        let guardrail3 = ClosureOutputGuardrail(name: "third") { _, _, _ in
+        let guardrail3 = OutputGuard("third") { _, _, _ in
             await logCapture.append("third")
             return .passed()
         }
@@ -560,7 +560,7 @@ extension OutputGuardrailTests {
     @Test("OutputGuardrail validates empty output")
     func outputGuardrailEmptyOutput() async throws {
         // Given
-        let guardrail = ClosureOutputGuardrail(name: "empty_checker") { output, _, _ in
+        let guardrail = OutputGuard("empty_checker") { output, _, _ in
             if output.isEmpty {
                 return .tripwire(message: "Output is empty")
             }
@@ -580,7 +580,7 @@ extension OutputGuardrailTests {
     func outputGuardrailLongOutput() async throws {
         // Given
         let longOutput = String(repeating: "a", count: 10000)
-        let guardrail = ClosureOutputGuardrail(name: "length_validator") { output, _, _ in
+        let guardrail = OutputGuard("length_validator") { output, _, _ in
             if output.count > 5000 {
                 return .tripwire(
                     message: "Output exceeds maximum length",
@@ -608,7 +608,7 @@ extension OutputGuardrailTests {
         Line 3
         """
 
-        let guardrail = ClosureOutputGuardrail(name: "line_counter") { output, _, _ in
+        let guardrail = OutputGuard("line_counter") { output, _, _ in
             let lineCount = output.components(separatedBy: "\n").count
             return .passed(
                 message: "Validated \(lineCount) lines",
@@ -629,7 +629,7 @@ extension OutputGuardrailTests {
     func outputGuardrailSpecialCharacters() async throws {
         // Given
         let specialOutput = "Special chars: \n\t\r\"'\\@#$%^&*()"
-        let guardrail = ClosureOutputGuardrail(name: "special_char_validator") { output, _, _ in
+        let guardrail = OutputGuard("special_char_validator") { output, _, _ in
             if output.contains("\\") {
                 return .tripwire(message: "Backslash detected")
             }
@@ -648,7 +648,7 @@ extension OutputGuardrailTests {
     func outputGuardrailUnicode() async throws {
         // Given
         let unicodeOutput = "Hello 世界 🌍 émoji"
-        let guardrail = ClosureOutputGuardrail(name: "unicode_validator") { output, _, _ in
+        let guardrail = OutputGuard("unicode_validator") { output, _, _ in
             .passed(
                 message: "Unicode validated",
                 metadata: ["characterCount": .int(output.count)]
@@ -676,7 +676,7 @@ extension OutputGuardrailTests {
         }
 
         let counter = CallCounter()
-        let guardrail = ClosureOutputGuardrail(name: "concurrent") { _, _, _ in
+        let guardrail = OutputGuard("concurrent") { _, _, _ in
             await counter.increment()
             try await Task.sleep(for: .milliseconds(10))
             return .passed()
