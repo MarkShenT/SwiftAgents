@@ -347,6 +347,50 @@ public struct PromptString: Sendable, ExpressibleByStringLiteral, ExpressibleByS
     }
 }
 
+// MARK: - #Tool Macro (Inline Tool)
+
+/// Creates an inline tool from a closure with labeled parameters.
+///
+/// The `#Tool` macro generates a complete `Tool`-conforming struct from a closure,
+/// eliminating the need to define a named struct for simple, one-off tools.
+///
+/// ## Usage
+///
+/// ```swift
+/// let greetTool = #Tool("greet", "Says hello to a person") { (name: String, age: Int) in
+///     "Hello, \(name)! You are \(age) years old."
+/// }
+/// ```
+///
+/// ## Generated Code
+///
+/// The macro generates:
+/// - A `Codable & Sendable` input struct with one stored property per closure parameter
+/// - A `Tool`-conforming struct with `name`, `description`, `parameters`, and `execute(_:)`
+/// - An IIFE (immediately invoked closure) that returns the tool instance
+///
+/// ## Type Mapping
+///
+/// | Closure parameter type | ToolParameter type |
+/// |------------------------|--------------------|
+/// | `String` | `.string` |
+/// | `Int` | `.int` |
+/// | `Double` / `Float` | `.double` |
+/// | `Bool` | `.bool` |
+/// | `T?` | Same as T, `isRequired: false` |
+///
+/// ## Relationship to @Tool
+///
+/// `@Tool` is the attached macro for named, reusable tool structs.
+/// `#Tool` is the freestanding expression macro for inline, anonymous tools.
+/// They share the name `Tool` but are distinguished by sigil (`@` vs `#`) and
+/// parameter count (one string vs two strings), so Swift resolves them unambiguously.
+@freestanding(expression)
+public macro Tool(
+    _ name: String,
+    _ description: String
+) = #externalMacro(module: "SwarmMacros", type: "InlineToolMacro")
+
 // MARK: - @Builder Macro
 
 /// A macro that generates fluent setter methods for all stored var properties of a struct.
