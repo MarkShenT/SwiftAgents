@@ -127,11 +127,9 @@ struct HiveAgentsTests {
 
         let thrown = await #expect(throws: (any Error).self) {
             _ = try await runControl.start(
-                RunStartRequest(
-                    threadID: HiveThreadID("t"),
-                    input: "Hello",
-                    options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
-                )
+                threadID: HiveThreadID("t"),
+                input: "Hello",
+                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
             )
         }
         let runtimeError = try #require(thrown as? HiveRuntimeError)
@@ -213,12 +211,13 @@ struct HiveAgentsTests {
 
         let runtime = try HiveRuntime(graph: graph, environment: environment)
         let runControl = GraphRunController(runtime: runtime)
-        let startRequest = RunStartRequest(
-            threadID: HiveThreadID("approval-thread"),
+        let startThreadID = HiveThreadID("approval-thread")
+        let startOptions = HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
+        let handle = try await runControl.start(
+            threadID: startThreadID,
             input: "Hello",
-            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
+            options: startOptions
         )
-        let handle = try await runControl.start(startRequest)
         let startEvents = await collectEvents(handle.events)
         #expect(startEvents.allSatisfy { event in event.id.runID == handle.runID })
         #expect(startEvents.allSatisfy { event in event.id.attemptID == handle.attemptID })
@@ -237,12 +236,10 @@ struct HiveAgentsTests {
         #expect(interruptEventID == interruption.interrupt.id)
 
         let resumeHandle = try await runControl.resume(
-            RunResumeRequest(
-                threadID: startRequest.threadID,
-                interruptID: interruption.interrupt.id,
-                payload: .toolApproval(decision: .approved),
-                options: startRequest.options
-            )
+            threadID: startThreadID,
+            interruptID: interruption.interrupt.id,
+            payload: .toolApproval(decision: .approved),
+            options: startOptions
         )
         let resumeEvents = await collectEvents(resumeHandle.events)
         #expect(resumeEvents.allSatisfy { event in event.id.runID == resumeHandle.runID })
@@ -287,21 +284,17 @@ struct HiveAgentsTests {
         let runControl = GraphRunController(runtime: runtime)
 
         let start = try await runControl.start(
-            .init(
-                threadID: HiveThreadID("approval-cancelled"),
-                input: "Hello",
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
-            )
+            threadID: HiveThreadID("approval-cancelled"),
+            input: "Hello",
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
         )
         let interrupted = try await requireInterruption(outcome: start.outcome.value)
 
         let resumed = try await runControl.resume(
-            .init(
-                threadID: HiveThreadID("approval-cancelled"),
-                interruptID: interrupted.interrupt.id,
-                payload: .toolApproval(decision: .cancelled),
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
-            )
+            threadID: HiveThreadID("approval-cancelled"),
+            interruptID: interrupted.interrupt.id,
+            payload: .toolApproval(decision: .cancelled),
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
         )
         let finalStore = try await requireFullStore(outcome: resumed.outcome.value)
         let messages = try finalStore.get(ChatGraph.Schema.messagesKey)
@@ -359,11 +352,9 @@ struct HiveAgentsTests {
         let runtime1 = try HiveRuntime(graph: graph, environment: makeEnvironment())
         let runControl1 = GraphRunController(runtime: runtime1)
         let start = try await runControl1.start(
-            .init(
-                threadID: HiveThreadID("approval-restart"),
-                input: "Hello",
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
-            )
+            threadID: HiveThreadID("approval-restart"),
+            input: "Hello",
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
         )
         let interrupted = try await requireInterruption(outcome: start.outcome.value)
 
@@ -371,12 +362,10 @@ struct HiveAgentsTests {
         let runtime2 = try HiveRuntime(graph: graph, environment: makeEnvironment())
         let runControl2 = GraphRunController(runtime: runtime2)
         let resumed = try await runControl2.resume(
-            .init(
-                threadID: HiveThreadID("approval-restart"),
-                interruptID: interrupted.interrupt.id,
-                payload: .toolApproval(decision: .approved),
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
-            )
+            threadID: HiveThreadID("approval-restart"),
+            interruptID: interrupted.interrupt.id,
+            payload: .toolApproval(decision: .approved),
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
         )
 
         let finalStore = try await requireFullStore(outcome: resumed.outcome.value)
@@ -418,21 +407,17 @@ struct HiveAgentsTests {
         let threadID = HiveThreadID("approval-options")
 
         let start = try await runControl.start(
-            .init(
-                threadID: threadID,
-                input: "Hello",
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
-            )
+            threadID: threadID,
+            input: "Hello",
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
         )
         let interrupted = try await requireInterruption(outcome: start.outcome.value)
 
         let resumed = try await runControl.resume(
-            .init(
-                threadID: threadID,
-                interruptID: interrupted.interrupt.id,
-                payload: .toolApproval(decision: .approved),
-                options: HiveRunOptions(maxSteps: 0, checkpointPolicy: .disabled)
-            )
+            threadID: threadID,
+            interruptID: interrupted.interrupt.id,
+            payload: .toolApproval(decision: .approved),
+            options: HiveRunOptions(maxSteps: 0, checkpointPolicy: .disabled)
         )
         let outcome = try await resumed.outcome.value
         guard case let .outOfSteps(maxSteps, _, _) = outcome else {
@@ -547,7 +532,7 @@ struct HiveAgentsTests {
             _ = try await runControl.getCheckpointHistory(threadID: HiveThreadID("query-unsupported"), limit: 1)
         }
         let queryError = try #require(thrown as? HiveCheckpointQueryError)
-        #expect(queryError == .unsupported(operation: .listCheckpoints))
+        #expect(queryError == .unsupported)
     }
 
     @Test("getState returns nil for missing thread and deterministic snapshot for existing thread")
@@ -571,18 +556,18 @@ struct HiveAgentsTests {
         #expect(try await runtime.getState(threadID: HiveThreadID("missing-thread")) == nil)
         #expect(try await runControl.getState(threadID: HiveThreadID("missing-thread")) == nil)
 
-        let request = RunStartRequest(
-            threadID: HiveThreadID("state-thread"),
+        let stateThreadID = HiveThreadID("state-thread")
+        let handle = try await runControl.start(
+            threadID: stateThreadID,
             input: "Hello",
             options: HiveRunOptions(maxSteps: 5, checkpointPolicy: .disabled)
         )
-        let handle = try await runControl.start(request)
         _ = try await handle.outcome.value
 
-        let runtimeSnapshot = try #require(try await runtime.getState(threadID: request.threadID))
-        #expect(runtimeSnapshot.threadID == request.threadID)
-        let snapshot = try #require(try await runControl.getState(threadID: request.threadID))
-        #expect(snapshot.threadID == request.threadID)
+        let runtimeSnapshot = try #require(try await runtime.getState(threadID: stateThreadID))
+        #expect(runtimeSnapshot.threadID == stateThreadID)
+        let snapshot = try #require(try await runControl.getState(threadID: stateThreadID))
+        #expect(snapshot.threadID == stateThreadID)
         #expect(snapshot.runID == handle.runID)
         #expect(snapshot.stepIndex != nil)
         #expect(snapshot.frontier.count >= 0)
@@ -621,21 +606,17 @@ struct HiveAgentsTests {
         let runControl = GraphRunController(runtime: runtime)
 
         let start = try await runControl.start(
-            .init(
-                threadID: threadID,
-                input: "hello",
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
-            )
+            threadID: threadID,
+            input: "hello",
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
         )
         let interruption = try await requireInterruption(outcome: start.outcome.value)
 
         let resumed = try await runControl.resume(
-            .init(
-                threadID: threadID,
-                interruptID: interruption.interrupt.id,
-                payload: .toolApproval(decision: .approved),
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
-            )
+            threadID: threadID,
+            interruptID: interruption.interrupt.id,
+            payload: .toolApproval(decision: .approved),
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
         )
         _ = try await resumed.outcome.value
 
@@ -731,22 +712,18 @@ struct HiveAgentsTests {
         let noInterruptRunControl = GraphRunController(runtime: noInterruptRuntime)
         let noInterruptThread = HiveThreadID("resume-no-interrupt")
         let noInterruptRun = try await noInterruptRunControl.start(
-            .init(
-                threadID: noInterruptThread,
-                input: "hello",
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
-            )
+            threadID: noInterruptThread,
+            input: "hello",
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
         )
         _ = try await noInterruptRun.outcome.value
 
         let noInterruptThrown = await #expect(throws: (any Error).self) {
             _ = try await noInterruptRunControl.resume(
-                .init(
-                    threadID: noInterruptThread,
-                    interruptID: HiveInterruptID("wrong"),
-                    payload: .toolApproval(decision: .approved),
-                    options: HiveRunOptions(maxSteps: 5, checkpointPolicy: .everyStep)
-                )
+                threadID: noInterruptThread,
+                interruptID: HiveInterruptID("wrong"),
+                payload: .toolApproval(decision: .approved),
+                options: HiveRunOptions(maxSteps: 5, checkpointPolicy: .everyStep)
             )
         }
         let noInterruptError = try #require(noInterruptThrown as? HiveRuntimeError)
@@ -776,22 +753,18 @@ struct HiveAgentsTests {
         let mismatchRuntime = try HiveRuntime(graph: graph, environment: mismatchEnvironment)
         let mismatchRunControl = GraphRunController(runtime: mismatchRuntime)
         let mismatchStart = try await mismatchRunControl.start(
-            .init(
-                threadID: HiveThreadID("resume-mismatch"),
-                input: "hello",
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
-            )
+            threadID: HiveThreadID("resume-mismatch"),
+            input: "hello",
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
         )
         let interruption = try await requireInterruption(outcome: mismatchStart.outcome.value)
 
         let mismatchThrown = await #expect(throws: (any Error).self) {
             _ = try await mismatchRunControl.resume(
-                .init(
-                    threadID: HiveThreadID("resume-mismatch"),
-                    interruptID: HiveInterruptID(interruption.interrupt.id.rawValue + "-wrong"),
-                    payload: .toolApproval(decision: .approved),
-                    options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
-                )
+                threadID: HiveThreadID("resume-mismatch"),
+                interruptID: HiveInterruptID(interruption.interrupt.id.rawValue + "-wrong"),
+                payload: .toolApproval(decision: .approved),
+                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
             )
         }
         let mismatchError = try #require(mismatchThrown as? HiveRuntimeError)
@@ -820,11 +793,9 @@ struct HiveAgentsTests {
         let runControl = GraphRunController(runtime: runtime)
 
         let handle = try await runControl.start(
-            .init(
-                threadID: HiveThreadID("event-schema-version"),
-                input: "hello",
-                options: HiveRunOptions(maxSteps: 5, checkpointPolicy: .disabled)
-            )
+            threadID: HiveThreadID("event-schema-version"),
+            input: "hello",
+            options: HiveRunOptions(maxSteps: 5, checkpointPolicy: .disabled)
         )
         let events = await collectEvents(handle.events)
         _ = try await handle.outcome.value
@@ -866,11 +837,9 @@ struct HiveAgentsTests {
             let threadID = HiveThreadID("seeded-determinism-thread")
 
             let handle = try await runControl.start(
-                .init(
-                    threadID: threadID,
-                    input: "hello",
-                    options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
-                )
+                threadID: threadID,
+                input: "hello",
+                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .disabled)
             )
             let events = await collectEvents(handle.events)
             _ = try await handle.outcome.value
@@ -933,11 +902,9 @@ struct HiveAgentsTests {
         let runtime = try HiveRuntime(graph: graph, environment: environment)
         let runControl = GraphRunController(runtime: runtime)
         let handle = try await runControl.start(
-            .init(
-                threadID: HiveThreadID("cancel-race-thread"),
-                input: "hello",
-                options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
-            )
+            threadID: HiveThreadID("cancel-race-thread"),
+            input: "hello",
+            options: HiveRunOptions(maxSteps: 10, checkpointPolicy: .everyStep)
         )
 
         let cancelTask = Task {

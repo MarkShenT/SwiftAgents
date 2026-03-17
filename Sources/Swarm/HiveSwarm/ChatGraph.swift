@@ -290,32 +290,6 @@ struct GraphRunController: Sendable {
         self.stateTracker = HiveAgentsStateTracker()
     }
 
-    @available(*, deprecated, message: "Use start(threadID:input:options:) instead.")
-    func start(_ request: RunStartRequest) async throws -> HiveRunHandle<ChatGraph.Schema> {
-        try validateRunOptions(request.options)
-        let handle = await runtime.run(
-            threadID: request.threadID,
-            input: request.input,
-            options: request.options
-        )
-        await stateTracker.markAttemptStarted(threadID: request.threadID, runID: handle.runID)
-        return decorate(handle: handle, threadID: request.threadID, eventBufferCapacity: request.options.eventBufferCapacity)
-    }
-
-    @available(*, deprecated, message: "Use resume(threadID:interruptID:payload:options:) instead.")
-    func resume(_ request: RunResumeRequest) async throws -> HiveRunHandle<ChatGraph.Schema> {
-        try validateRunOptions(request.options)
-        try await validateResumeRequest(request)
-        let handle = await runtime.resume(
-            threadID: request.threadID,
-            interruptID: request.interruptID,
-            payload: request.payload,
-            options: request.options
-        )
-        await stateTracker.markAttemptStarted(threadID: request.threadID, runID: handle.runID)
-        return decorate(handle: handle, threadID: request.threadID, eventBufferCapacity: request.options.eventBufferCapacity)
-    }
-
     /// Convenience overload — pass parameters directly without constructing a request struct.
     func start(
         threadID: HiveThreadID,

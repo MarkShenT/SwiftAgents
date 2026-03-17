@@ -49,6 +49,16 @@ public protocol EmbeddingProvider: Sendable {
     /// - Throws: `EmbeddingError` if embedding fails
     func embed(_ text: String) async throws -> [Float]
 
+    /// Embed a query text into a vector (optimized for retrieval)
+    ///
+    /// Some models (like Snowflake Arctic) benefit from different processing
+    /// for queries vs documents. Default implementation calls `embed(_:)`.
+    ///
+    /// - Parameter query: The search query to embed
+    /// - Returns: A vector of floats representing the query's semantic meaning
+    /// - Throws: `EmbeddingError` if embedding fails
+    func embedQuery(_ query: String) async throws -> [Float]
+
     /// Batch embed multiple texts
     ///
     /// Default implementation calls `embed(_:)` sequentially.
@@ -65,6 +75,11 @@ public protocol EmbeddingProvider: Sendable {
 public extension EmbeddingProvider {
     /// Default model identifier
     var modelIdentifier: String { "unknown" }
+
+    /// Default query embedding implementation
+    func embedQuery(_ query: String) async throws -> [Float] {
+        try await embed(query)
+    }
 
     /// Default batch implementation - sequential embedding
     ///

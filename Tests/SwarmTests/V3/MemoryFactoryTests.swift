@@ -1,52 +1,52 @@
 // MemoryFactoryTests.swift
 // SwarmTests
 //
-// TDD tests for AnyMemory static factory methods.
+// TDD tests for Memory protocol factory extensions (V3 dot-syntax).
 
 import Testing
 @testable import Swarm
 
-@Suite("AnyMemory Factory Methods")
+@Suite("Memory Factory Extensions")
 struct MemoryFactoryTests {
-    @Test("conversation factory creates AnyMemory")
+    @Test("conversation factory creates ConversationMemory")
     func conversationFactory() async {
-        let memory = AnyMemory.conversation()
+        let memory: any Memory = .conversation()
         let count = await memory.count
         #expect(count == 0)
     }
 
     @Test("conversation factory respects maxMessages parameter")
     func conversationFactoryWithMaxMessages() async {
-        let memory = AnyMemory.conversation(maxMessages: 50)
+        let memory: any Memory = .conversation(maxMessages: 50)
         let count = await memory.count
         #expect(count == 0)
     }
 
-    @Test("slidingWindow factory creates AnyMemory")
+    @Test("slidingWindow factory creates SlidingWindowMemory")
     func slidingWindowFactory() async {
-        let memory = AnyMemory.slidingWindow(maxTokens: 1000)
+        let memory: any Memory = .slidingWindow(maxTokens: 1000)
         let count = await memory.count
         #expect(count == 0)
     }
 
     @Test("slidingWindow factory uses default maxTokens")
     func slidingWindowFactoryDefaultTokens() async {
-        let memory = AnyMemory.slidingWindow()
+        let memory: any Memory = .slidingWindow()
         let count = await memory.count
         #expect(count == 0)
     }
 
-    @Test("vector factory creates AnyMemory with provider")
+    @Test("vector factory creates VectorMemory with provider")
     func vectorFactory() async {
         let provider = MockEmbeddingProvider()
-        let memory = AnyMemory.vector(embeddingProvider: provider)
+        let memory: any Memory = .vector(embeddingProvider: provider)
         let count = await memory.count
         #expect(count == 0)
     }
 
-    @Test("persistent factory creates AnyMemory with default in-memory backend")
+    @Test("persistent factory creates PersistentMemory with default in-memory backend")
     func persistentFactory() async {
-        let memory = AnyMemory.persistent()
+        let memory: any Memory = .persistent()
         let count = await memory.count
         #expect(count == 0)
     }
@@ -54,7 +54,7 @@ struct MemoryFactoryTests {
     @Test("persistent factory respects custom backend")
     func persistentFactoryCustomBackend() async {
         let backend = InMemoryBackend()
-        let memory = AnyMemory.persistent(backend: backend)
+        let memory: any Memory = .persistent(backend: backend)
         let count = await memory.count
         #expect(count == 0)
     }

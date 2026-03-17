@@ -396,3 +396,29 @@ public actor AnyTracer: Tracer {
     private let _trace: @Sendable (TraceEvent) async -> Void
     private let _flush: @Sendable () async -> Void
 }
+
+// MARK: - V3 Tracer Factory Extensions
+
+extension Tracer where Self == ConsoleTracer {
+    /// Creates a console tracer that prints events to stdout.
+    public static func console(
+        minimumLevel: EventLevel = .trace,
+        colorized: Bool = true,
+        includeTimestamp: Bool = true
+    ) -> ConsoleTracer {
+        ConsoleTracer(
+            minimumLevel: minimumLevel,
+            colorized: colorized,
+            includeTimestamp: includeTimestamp
+        )
+    }
+}
+
+extension Tracer where Self == SwiftLogTracer {
+    /// Creates a tracer backed by swift-log.
+    public static func swiftLog(
+        minimumLevel: EventLevel = .info
+    ) -> SwiftLogTracer {
+        SwiftLogTracer(minimumLevel: minimumLevel)
+    }
+}

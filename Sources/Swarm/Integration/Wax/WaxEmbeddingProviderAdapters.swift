@@ -19,6 +19,11 @@ public struct SwarmEmbeddingProviderAdapter: EmbeddingProvider {
         try await base.embed(text)
     }
 
+    public func embedQuery(_ query: String) async throws -> [Float] {
+        // WaxVectorSearch.EmbeddingProvider has no embedQuery — fall back to embed
+        try await base.embed(query)
+    }
+
     public func embed(_ texts: [String]) async throws -> [[Float]] {
         if let batch = base as? any WaxVectorSearch.BatchEmbeddingProvider {
             return try await batch.embed(batch: texts)

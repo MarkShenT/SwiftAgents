@@ -10,14 +10,15 @@ import Foundation
 /// Protocol defining memory storage and retrieval for agents.
 ///
 /// `Memory` provides the contract for storing conversation history
-/// and retrieving relevant context for agent operations. All implementations
-/// must be actors to ensure thread-safe access.
+/// and retrieving relevant context for agent operations.
 ///
 /// ## Conformance Requirements
 ///
-/// - Must be an `actor` (inherited from protocol requirements)
 /// - Must be `Sendable` for safe concurrent access
-/// - All methods are implicitly `async` due to actor isolation
+/// - All methods must be `async` to accommodate actor and non-actor implementations
+///
+/// Actor conformances (the recommended pattern) satisfy `Sendable` automatically.
+/// Non-actor conformances are also valid when thread-safety is handled via other means.
 ///
 /// ## Example Implementation
 ///
@@ -44,7 +45,7 @@ import Foundation
 ///     public var count: Int { messages.count }
 /// }
 /// ```
-public protocol Memory: Actor, Sendable {
+public protocol Memory: Sendable {
     /// The number of messages currently stored.
     var count: Int { get async }
 
@@ -152,130 +153,142 @@ public extension MemoryMessage {
     }
 }
 
-// MARK: - AnyMemory
+// MARK: - Memory Factory Extensions (V3)
 
-/// Type-erased wrapper for any Memory implementation.
-///
-/// Useful when you need to store different memory types in collections
-/// or pass them through APIs that don't support generics.
-///
-/// ## Usage
-///
-/// ```swift
-/// let conversation = ConversationMemory(maxMessages: 50)
-/// let erased = AnyMemory(conversation)
-/// await erased.add(.user("Hello"))
-/// ```
-public actor AnyMemory: Memory {
-    // MARK: Public
-
-    public var count: Int {
-        get async {
-            await _count()
-        }
-    }
-
-    public var isEmpty: Bool {
-        get async {
-            await _isEmpty()
-        }
-    }
-
-    /// Creates a type-erased wrapper around any Memory.
+extension Memory where Self == ConversationMemory {
+    /// Creates a `ConversationMemory` with a maximum message count.
     ///
-    /// - Parameter memory: The memory implementation to wrap.
-    public init(_ memory: some Memory) {
-        _add = { message in await memory.add(message) }
-        _context = { query, limit in await memory.context(for: query, tokenLimit: limit) }
-        _allMessages = { await memory.allMessages() }
-        _clear = { await memory.clear() }
-        _count = { await memory.count }
-        _isEmpty = { await memory.isEmpty }
-    }
-
-    public func add(_ message: MemoryMessage) async {
-        await _add(message)
-    }
-
-    public func context(for query: String, tokenLimit: Int) async -> String {
-        await _context(query, tokenLimit)
-    }
-
-    public func allMessages() async -> [MemoryMessage] {
-        await _allMessages()
-    }
-
-    public func clear() async {
-        await _clear()
-    }
-
-    // MARK: Private
-
-    private let _add: @Sendable (MemoryMessage) async -> Void
-    private let _context: @Sendable (String, Int) async -> String
-    private let _allMessages: @Sendable () async -> [MemoryMessage]
-    private let _clear: @Sendable () async -> Void
-    private let _count: @Sendable () async -> Int
-    private let _isEmpty: @Sendable () async -> Bool
-}
-
-// MARK: - AnyMemory Factory Methods
-
-public extension AnyMemory {
-    /// Creates an `AnyMemory` wrapping a `ConversationMemory`.
+    /// Enables dot-syntax at any `some Memory` call site:
+    ///
+    /// ```swift
+    /// agent.withMemory(.conversation())
+    /// agent.withMemory(.conversation(maxMessages: 50))
+    /// ```
     ///
     /// - Parameter maxMessages: Maximum messages to retain (default: 100).
-    /// - Returns: A type-erased memory backed by `ConversationMemory`.
-    static func conversation(maxMessages: Int = 100) -> AnyMemory {
-        AnyMemory(ConversationMemory(maxMessages: maxMessages))
+    /// - Returns: A `ConversationMemory` instance.
+    public static func conversation(maxMessages: Int = 100) -> ConversationMemory {
+        ConversationMemory(maxMessages: maxMessages)
     }
+}
 
-    /// Creates an `AnyMemory` wrapping a `SlidingWindowMemory`.
+extension Memory where Self == SlidingWindowMemory {
+    /// Creates a `SlidingWindowMemory` with a maximum token count.
+    ///
+    /// Enables dot-syntax at any `some Memory` call site:
+    ///
+    /// ```swift
+    /// agent.withMemory(.slidingWindow())
+    /// agent.withMemory(.slidingWindow(maxTokens: 8000))
+    /// ```
     ///
     /// - Parameter maxTokens: Maximum tokens to retain (default: 4000).
-    /// - Returns: A type-erased memory backed by `SlidingWindowMemory`.
-    static func slidingWindow(maxTokens: Int = 4000) -> AnyMemory {
-        AnyMemory(SlidingWindowMemory(maxTokens: maxTokens))
+    /// - Returns: A `SlidingWindowMemory` instance.
+    public static func slidingWindow(maxTokens: Int = 4000) -> SlidingWindowMemory {
+        SlidingWindowMemory(maxTokens: maxTokens)
     }
+}
 
-    /// Creates an `AnyMemory` wrapping a `VectorMemory`.
+extension Memory where Self == PersistentMemory {
+    /// Creates a `PersistentMemory` with a pluggable storage backend.
     ///
-    /// - Parameters:
-    ///   - embeddingProvider: Provider for generating text embeddings.
-    ///   - similarityThreshold: Minimum similarity for results (0–1, default: 0.7).
-    ///   - maxResults: Maximum results to return (default: 10).
-    /// - Returns: A type-erased memory backed by `VectorMemory`.
-    static func vector(
-        embeddingProvider: any EmbeddingProvider,
-        similarityThreshold: Float = 0.7,
-        maxResults: Int = 10
-    ) -> AnyMemory {
-        AnyMemory(VectorMemory(
-            embeddingProvider: embeddingProvider,
-            similarityThreshold: similarityThreshold,
-            maxResults: maxResults
-        ))
-    }
-
-    /// Creates an `AnyMemory` wrapping a `PersistentMemory`.
+    /// Defaults to an `InMemoryBackend`, which makes this suitable for
+    /// testing and prototyping without any database dependencies.
     ///
-    /// Defaults to an `InMemoryBackend` when no backend is provided, making
-    /// it suitable for testing and prototyping without database dependencies.
+    /// Enables dot-syntax at any `some Memory` call site:
+    ///
+    /// ```swift
+    /// agent.withMemory(.persistent())
+    /// agent.withMemory(.persistent(backend: myBackend, conversationId: "session-1"))
+    /// ```
     ///
     /// - Parameters:
     ///   - backend: The storage backend (default: `InMemoryBackend()`).
     ///   - conversationId: Unique identifier for this conversation (default: random UUID).
     ///   - maxMessages: Maximum messages to retain; 0 means unlimited (default: 0).
-    /// - Returns: A type-erased memory backed by `PersistentMemory`.
-    static func persistent(
+    /// - Returns: A `PersistentMemory` instance.
+    public static func persistent(
         backend: any PersistentMemoryBackend = InMemoryBackend(),
         conversationId: String = UUID().uuidString,
         maxMessages: Int = 0
-    ) -> AnyMemory {
-        AnyMemory(PersistentMemory(
+    ) -> PersistentMemory {
+        PersistentMemory(
             backend: backend,
             conversationId: conversationId,
             maxMessages: maxMessages
-        ))
+        )
+    }
+}
+
+extension Memory where Self == HybridMemory {
+    /// Creates a `HybridMemory` combining short-term and summarized long-term memory.
+    ///
+    /// Enables dot-syntax at any `some Memory` call site:
+    ///
+    /// ```swift
+    /// agent.withMemory(.hybrid())
+    /// agent.withMemory(.hybrid(configuration: .init(shortTermMaxMessages: 50)))
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - configuration: Behavior configuration (default: `.default`).
+    ///   - summarizer: Summarization service (default: `TruncatingSummarizer.shared`).
+    /// - Returns: A `HybridMemory` instance.
+    public static func hybrid(
+        configuration: HybridMemory.Configuration = .default,
+        summarizer: any Summarizer = TruncatingSummarizer.shared
+    ) -> HybridMemory {
+        HybridMemory(configuration: configuration, summarizer: summarizer)
+    }
+}
+
+extension Memory where Self == SummaryMemory {
+    /// Creates a `SummaryMemory` that automatically summarizes old messages.
+    ///
+    /// Enables dot-syntax at any `some Memory` call site:
+    ///
+    /// ```swift
+    /// agent.withMemory(.summary())
+    /// agent.withMemory(.summary(configuration: .init(recentMessageCount: 30)))
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - configuration: Behavior configuration (default: `.default`).
+    ///   - summarizer: Summarization service (default: `TruncatingSummarizer.shared`).
+    /// - Returns: A `SummaryMemory` instance.
+    public static func summary(
+        configuration: SummaryMemory.Configuration = .default,
+        summarizer: any Summarizer = TruncatingSummarizer.shared
+    ) -> SummaryMemory {
+        SummaryMemory(configuration: configuration, summarizer: summarizer)
+    }
+}
+
+extension Memory where Self == VectorMemory {
+    /// Creates a `VectorMemory` backed by semantic embeddings.
+    ///
+    /// Enables dot-syntax at any `some Memory` call site when an embedding
+    /// provider is available:
+    ///
+    /// ```swift
+    /// agent.withMemory(.vector(embeddingProvider: myProvider))
+    /// agent.withMemory(.vector(embeddingProvider: myProvider, similarityThreshold: 0.8))
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - embeddingProvider: Provider for generating text embeddings.
+    ///   - similarityThreshold: Minimum similarity for results (0–1, default: 0.7).
+    ///   - maxResults: Maximum results to return (default: 10).
+    /// - Returns: A `VectorMemory` instance.
+    public static func vector(
+        embeddingProvider: any EmbeddingProvider,
+        similarityThreshold: Float = 0.7,
+        maxResults: Int = 10
+    ) -> VectorMemory {
+        VectorMemory(
+            embeddingProvider: embeddingProvider,
+            similarityThreshold: similarityThreshold,
+            maxResults: maxResults
+        )
     }
 }

@@ -147,11 +147,9 @@ struct ModelRouterTests {
 
         // Should not throw — modelRouter satisfies the model requirement
         let handle = try await runControl.start(
-            RunStartRequest(
-                threadID: HiveThreadID("preflight-test"),
-                input: "Hello",
-                options: HiveRunOptions(maxSteps: 5, checkpointPolicy: .disabled)
-            )
+            threadID: HiveThreadID("preflight-test"),
+            input: "Hello",
+            options: HiveRunOptions(maxSteps: 5, checkpointPolicy: .disabled)
         )
         let outcome = try await handle.outcome.value
 

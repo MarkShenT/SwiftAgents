@@ -236,12 +236,16 @@ public func Parameter(
 
 // MARK: - ToolBuilder
 
-/// A result builder for constructing arrays of tools.
+/// A result builder for constructing a `ToolCollection` using declarative DSL syntax.
+///
+/// `ToolBuilder` is the V3 canonical way to supply tools to an `Agent`. The
+/// `AnyJSONTool` internal protocol is never exposed — callers work with concrete
+/// `Tool` conformers or `any Tool` existentials and receive an opaque
+/// `ToolCollection` in return.
 ///
 /// Example:
 /// ```swift
-/// @ToolBuilder
-/// func makeTools() -> [any AnyJSONTool] {
+/// let agent = try Agent("Be helpful.") {
 ///     CalculatorTool()
 ///     WeatherTool()
 ///     if includeDebug {
@@ -251,58 +255,84 @@ public func Parameter(
 /// ```
 @resultBuilder
 public struct ToolBuilder {
-    /// Builds an empty tool array for empty builder bodies.
-    public static func buildBlock() -> [any AnyJSONTool] {
-        []
+
+    // MARK: - Empty builder body
+
+    /// Returns an empty `ToolCollection` for an empty builder body.
+    public static func buildBlock() -> ToolCollection {
+        .empty
     }
 
-    /// Builds a tool array from multiple tools.
-    public static func buildBlock(_ components: (any AnyJSONTool)...) -> [any AnyJSONTool] {
-        components
+    // MARK: - Variadic block
+
+    /// Combines multiple `ToolCollection` components into one.
+    public static func buildBlock(_ components: ToolCollection...) -> ToolCollection {
+        ToolCollection(storage: components.flatMap(\.storage))
     }
 
-    /// Builds a tool array from arrays of tools.
-    public static func buildBlock(_ components: [any AnyJSONTool]...) -> [any AnyJSONTool] {
-        components.flatMap(\.self)
+    // MARK: - buildExpression overloads
+
+    /// Wraps a concrete `Tool` conformer into a `ToolCollection`.
+    ///
+    /// The generic parameter preserves the concrete type so the compiler
+    /// can produce a properly-typed `AnyJSONToolAdapter<T>` without a cast.
+    public static func buildExpression<T: Tool>(_ expression: T) -> ToolCollection {
+        ToolCollection(storage: [AnyJSONToolAdapter(expression)])
     }
 
-    /// Builds a tool array from an optional tool.
-    public static func buildOptional(_ component: [any AnyJSONTool]?) -> [any AnyJSONTool] {
-        component ?? []
+    /// Wraps an `any Tool` existential into a `ToolCollection`.
+    ///
+    /// Swift 5.7+ existential opening means the compiler infers the concrete
+    /// type `T` when the existential is passed to `bridgeToolToAnyJSON<T: Tool>`.
+    public static func buildExpression(_ expression: any Tool) -> ToolCollection {
+        ToolCollection(storage: [bridgeToolToAnyJSON(expression)])
     }
 
-    /// Builds a tool array from the first branch of an if-else.
-    public static func buildEither(first component: [any AnyJSONTool]) -> [any AnyJSONTool] {
+    /// Wraps an internal `AnyJSONTool` value into a `ToolCollection`.
+    ///
+    /// Used by framework-internal code that already holds `any AnyJSONTool`
+    /// (e.g. built-in tool registries). Not part of the public V3 API surface.
+    internal static func buildExpression(_ expression: any AnyJSONTool) -> ToolCollection {
+        ToolCollection(storage: [expression])
+    }
+
+    /// Wraps an internal `[any AnyJSONTool]` array into a `ToolCollection`.
+    ///
+    /// Used by framework-internal code that already holds a typed tool array.
+    /// Not part of the public V3 API surface.
+    internal static func buildExpression(_ expression: [any AnyJSONTool]) -> ToolCollection {
+        ToolCollection(storage: expression)
+    }
+
+    /// Wraps an array of `any Tool` existentials into a `ToolCollection`.
+    public static func buildExpression(_ expression: [any Tool]) -> ToolCollection {
+        ToolCollection(storage: expression.map { bridgeToolToAnyJSON($0) })
+    }
+
+    // MARK: - Control-flow support
+
+    /// Returns the component when the `if` condition is true, or `.empty` when absent.
+    public static func buildOptional(_ component: ToolCollection?) -> ToolCollection {
+        component ?? .empty
+    }
+
+    /// Returns the first branch of an `if`/`else` expression.
+    public static func buildEither(first component: ToolCollection) -> ToolCollection {
         component
     }
 
-    /// Builds a tool array from the second branch of an if-else.
-    public static func buildEither(second component: [any AnyJSONTool]) -> [any AnyJSONTool] {
+    /// Returns the second branch of an `if`/`else` expression.
+    public static func buildEither(second component: ToolCollection) -> ToolCollection {
         component
     }
 
-    /// Builds a tool array from a for-in loop.
-    public static func buildArray(_ components: [[any AnyJSONTool]]) -> [any AnyJSONTool] {
-        components.flatMap(\.self)
+    /// Flattens a `for`-`in` loop of `ToolCollection` values into one collection.
+    public static func buildArray(_ components: [ToolCollection]) -> ToolCollection {
+        ToolCollection(storage: components.flatMap(\.storage))
     }
 
-    /// Converts a single tool to an array.
-    public static func buildExpression(_ expression: any AnyJSONTool) -> [any AnyJSONTool] {
-        [expression]
-    }
-
-    /// Converts a typed tool to a dynamic tool array.
-    public static func buildExpression<T: Tool>(_ expression: T) -> [any AnyJSONTool] {
-        [AnyJSONToolAdapter(expression)]
-    }
-
-    /// Passes through an array of tools.
-    public static func buildExpression(_ expression: [any AnyJSONTool]) -> [any AnyJSONTool] {
-        expression
-    }
-
-    /// Builds from a limited availability check.
-    public static func buildLimitedAvailability(_ component: [any AnyJSONTool]) -> [any AnyJSONTool] {
+    /// Passes through a component produced inside a `#available` / `@available` check.
+    public static func buildLimitedAvailability(_ component: ToolCollection) -> ToolCollection {
         component
     }
 }

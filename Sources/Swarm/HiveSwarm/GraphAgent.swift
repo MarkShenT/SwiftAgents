@@ -114,13 +114,11 @@ struct GraphAgent: AgentRuntime, Sendable {
         await observer?.onAgentStart(context: nil, agent: self, input: input)
 
         do {
-            let request = RunStartRequest(
+            let handle = try await runtime.runControl.start(
                 threadID: threadID,
                 input: input,
                 options: runOptions
             )
-
-            let handle = try await runtime.runControl.start(request)
             await cancellation.track(handle)
 
             let outcome = try await handle.outcome.value
@@ -187,13 +185,11 @@ struct GraphAgent: AgentRuntime, Sendable {
             await observer?.onAgentStart(context: nil, agent: self, input: input)
 
             do {
-                let request = RunStartRequest(
+                let handle = try await runtime.runControl.start(
                     threadID: threadID,
                     input: input,
                     options: runOptions
                 )
-
-                let handle = try await runtime.runControl.start(request)
                 await cancellation.track(handle)
 
                 // Fork a task to consume Hive events and yield mapped AgentEvents.
@@ -539,35 +535,8 @@ struct GraphAgent: AgentRuntime, Sendable {
             return .invalidInput(reason: "Hive interrupt pending: \(interruptID.rawValue)")
         case .noCheckpointToResume:
             return .invalidInput(reason: "Hive resume requested with no checkpoint to resume.")
-        case let .checkpointNotFound(id):
-            return .invalidInput(reason: "Hive checkpoint not found: \(id.rawValue)")
         case .noInterruptToResume:
             return .invalidInput(reason: "Hive resume requested with no pending interrupt.")
-        case let .resumeInterruptMismatch(expected, found):
-            return .invalidInput(
-                reason: "Hive resume interrupt mismatch (expected \(expected.rawValue), found \(found.rawValue))."
-            )
-        case let .forkSourceCheckpointMissing(threadID, checkpointID):
-            let checkpoint = checkpointID?.rawValue ?? "latest"
-            return .invalidInput(
-                reason: "Hive fork source checkpoint missing for thread '\(threadID.rawValue)' (checkpoint=\(checkpoint))."
-            )
-        case .forkCheckpointStoreMissing:
-            return .internalError(reason: "Hive fork requested without checkpoint store.")
-        case .forkCheckpointQueryUnsupported:
-            return .invalidInput(reason: "Hive fork requires a checkpoint store that supports query operations.")
-        case let .forkTargetThreadConflict(threadID):
-            return .invalidInput(reason: "Hive fork target thread conflict: \(threadID.rawValue)")
-        case let .forkSchemaGraphMismatch(expectedSchema, expectedGraph, foundSchema, foundGraph):
-            return .internalError(
-                reason: """
-                Hive fork schema/graph mismatch.
-                expected(schema=\(expectedSchema), graph=\(expectedGraph))
-                found(schema=\(foundSchema), graph=\(foundGraph))
-                """
-            )
-        case let .forkMalformedCheckpoint(field, errorDescription):
-            return .internalError(reason: "Hive fork checkpoint malformed at '\(field)': \(errorDescription)")
 
         case let .unknownNodeID(nodeID):
             return .internalError(reason: "Hive unknown node ID: \(nodeID.rawValue)")
@@ -613,6 +582,8 @@ struct GraphAgent: AgentRuntime, Sendable {
             return .maxIterationsExceeded(iterations: maxModelInvocations)
         case let .internalInvariantViolation(reason):
             return .internalError(reason: "Hive internal invariant violation: \(reason)")
+        @unknown default:
+            return .internalError(reason: "Unknown Hive runtime error: \(error)")
         }
     }
 }

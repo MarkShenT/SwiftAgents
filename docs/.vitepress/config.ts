@@ -3,6 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'Swarm',
   description: 'Multi-agent orchestration for Swift — built for production, not demos.',
+  base: '/Swarm/',
 
   head: [
     // Satoshi from Fontshare
@@ -54,38 +55,10 @@ export default defineConfig({
           ]
         },
         {
-          text: 'Core Concepts',
+          text: 'API Reference',
           items: [
-            { text: 'Agents', link: '/agents' },
-            { text: 'Tools', link: '/tools' },
-            { text: 'DSL & Blueprints', link: '/dsl' },
-            { text: 'Orchestration', link: '/orchestration' },
-            { text: 'Handoffs', link: '/Handoffs' },
-          ]
-        },
-        {
-          text: 'Data & State',
-          items: [
-            { text: 'Memory', link: '/memory' },
-            { text: 'Sessions', link: '/sessions' },
-            { text: 'Streaming', link: '/streaming' },
-          ]
-        },
-        {
-          text: 'Production',
-          items: [
-            { text: 'Guardrails', link: '/guardrails' },
-            { text: 'Resilience', link: '/resilience' },
-            { text: 'Observability', link: '/observability' },
-            { text: 'MCP', link: '/mcp' },
-            { text: 'Providers', link: '/providers' },
-          ]
-        },
-        {
-          text: 'Resources',
-          items: [
-            { text: 'Migration Guide', link: '/MIGRATION_GUIDE' },
-            { text: 'Troubleshooting', link: '/TROUBLESHOOTING' },
+            { text: 'Overview', link: '/reference/overview' },
+            { text: 'Complete Reference', link: '/swarm-complete-reference' },
           ]
         },
       ],

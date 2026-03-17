@@ -24,18 +24,17 @@ public typealias OutputValidationHandler = @Sendable (String, any AgentRuntime, 
 ///
 /// Example:
 /// ```swift
-/// let guardrail = ClosureOutputGuardrail(name: "content_filter") { output, agent, context in
+/// let guardrail = OutputGuard("content_filter") { output in
 ///     if output.contains("badword") {
 ///         return .tripwire(
-///             message: "Profanity detected",
-///             outputInfo: .dictionary(["word": .string("badword")])
+///             message: "Profanity detected"
 ///         )
 ///     }
 ///     return .passed()
 /// }
 ///
 /// let result = try await guardrail.validate(
-///     "LegacyAgent response text",
+///     "Agent response text",
 ///     agent: myAgent,
 ///     context: context
 /// )
@@ -59,60 +58,9 @@ public protocol OutputGuardrail: Guardrail {
     func validate(_ output: String, agent: any AgentRuntime, context: AgentContext?) async throws -> GuardrailResult
 }
 
-// MARK: - ClosureOutputGuardrail
-
-/// A closure-based implementation of `OutputGuardrail`.
-///
-/// `ClosureOutputGuardrail` wraps a validation closure, making it easy to create
-/// custom output guardrails without defining new types.
-///
-/// The closure receives:
-/// - `output`: The agent's output text
-/// - `agent`: The agent instance that produced the output
-/// - `context`: Optional shared orchestration context
-///
-/// The closure is marked `@Sendable` to ensure thread-safety across async boundaries.
-///
-/// Example:
-/// ```swift
-/// // PII detection guardrail
-/// let piiGuardrail = ClosureOutputGuardrail(name: "pii_detector") { output, agent, context in
-///     let patterns = ["\\d{3}-\\d{2}-\\d{4}", "\\d{16}"] // SSN, credit card
-///     for pattern in patterns {
-///         if let _ = output.range(of: pattern, options: .regularExpression) {
-///             return .tripwire(
-///                 message: "PII detected in output",
-///                 outputInfo: .dictionary(["pattern": .string(pattern)])
-///             )
-///         }
-///     }
-///     return .passed(message: "No PII detected")
-/// }
-///
-/// // Length validation
-/// let lengthGuardrail = ClosureOutputGuardrail(name: "min_length") { output, _, _ in
-///     if output.count < 10 {
-///         return .tripwire(message: "Output too short")
-///     }
-///     return .passed()
-/// }
-///
-/// // Context-aware validation
-/// let contextGuardrail = ClosureOutputGuardrail(name: "strict_mode") { output, _, context in
-///     if let mode = await context?.get("validation_mode")?.stringValue, mode == "strict" {
-///         // Apply stricter validation
-///         if output.contains("forbidden") {
-///             return .tripwire(message: "Forbidden content in strict mode")
-///         }
-///     }
-///     return .passed()
-/// }
-/// ```
 // MARK: - OutputGuard
 
 /// A lightweight, closure-based `OutputGuardrail` with a concise API.
-///
-/// Prefer `OutputGuard` over `ClosureOutputGuardrail` for new code.
 ///
 /// Examples:
 /// ```swift
@@ -203,5 +151,22 @@ public extension OutputGuard {
         _ validate: @escaping @Sendable (String) async throws -> GuardrailResult
     ) -> OutputGuard {
         OutputGuard(name, validate)
+    }
+}
+
+// MARK: - V3 Protocol Factory Extensions
+
+extension OutputGuardrail where Self == OutputGuard {
+    /// Creates a max-length output guardrail.
+    public static func maxLength(_ maxLength: Int, name: String = "MaxOutputLengthGuardrail") -> OutputGuard {
+        OutputGuard.maxLength(maxLength, name: name)
+    }
+
+    /// Creates a custom output guardrail.
+    public static func custom(
+        _ name: String,
+        _ validate: @escaping @Sendable (String) async throws -> GuardrailResult
+    ) -> OutputGuard {
+        OutputGuard.custom(name, validate)
     }
 }

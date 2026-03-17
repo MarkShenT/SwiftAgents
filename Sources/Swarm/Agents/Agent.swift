@@ -47,15 +47,15 @@ public struct Agent: AgentRuntime, Sendable {
 
     // MARK: - Agent Protocol Properties
 
-    public let tools: [any AnyJSONTool]
-    public let instructions: String
-    public let configuration: AgentConfiguration
-    public let memory: (any Memory)?
-    public let inferenceProvider: (any InferenceProvider)?
-    public let inputGuardrails: [any InputGuardrail]
-    public let outputGuardrails: [any OutputGuardrail]
-    public let tracer: (any Tracer)?
-    public let guardrailRunnerConfiguration: GuardrailRunnerConfiguration
+    public private(set) var tools: [any AnyJSONTool]
+    public private(set) var instructions: String
+    public private(set) var configuration: AgentConfiguration
+    public private(set) var memory: (any Memory)?
+    public private(set) var inferenceProvider: (any InferenceProvider)?
+    public private(set) var inputGuardrails: [any InputGuardrail]
+    public private(set) var outputGuardrails: [any OutputGuardrail]
+    public private(set) var tracer: (any Tracer)?
+    public private(set) var guardrailRunnerConfiguration: GuardrailRunnerConfiguration
 
     /// Configured handoffs for this agent.
     public var handoffs: [AnyHandoffConfiguration] {
@@ -267,10 +267,10 @@ public struct Agent: AgentRuntime, Sendable {
         outputGuardrails: [any OutputGuardrail] = [],
         guardrailRunnerConfiguration: GuardrailRunnerConfiguration = .default,
         handoffs: [AnyHandoffConfiguration] = [],
-        @ToolBuilder tools: () -> [any AnyJSONTool] = { [] }
+        @ToolBuilder tools: () -> ToolCollection = { .empty }
     ) throws {
         try self.init(
-            tools: tools(),
+            tools: tools().storage,
             instructions: instructions,
             configuration: configuration,
             memory: memory,
@@ -386,11 +386,11 @@ public struct Agent: AgentRuntime, Sendable {
         }
     }
 
-    private let _handoffs: [AnyHandoffConfiguration]
+    private var _handoffs: [AnyHandoffConfiguration]
 
     // MARK: - Internal State
 
-    private let toolRegistry: ToolRegistry
+    private var toolRegistry: ToolRegistry
     private let cancellationState = ActiveRunCancellationState()
     private static let autoResponseTracker = ResponseTracker()
     private static let responseIDMetadataKey = "response.id"
@@ -1670,5 +1670,135 @@ public extension Agent {
             guardrailRunnerConfiguration: guardrailRunnerConfiguration,
             handoffs: handoffs
         )
+    }
+}
+
+// MARK: - V3 Canonical Init with Explicit Provider
+
+public extension Agent {
+    /// V3 convenience init with an explicit, non-optional inference provider.
+    ///
+    /// This overload avoids the optional wrapping when a provider is always known:
+    /// ```swift
+    /// let agent = try Agent("You are helpful.", provider: .anthropic(key: apiKey)) {
+    ///     WeatherTool()
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - instructions: System instructions defining agent behavior.
+    ///   - provider: The inference provider to use.
+    ///   - tools: A `@ToolBuilder` closure producing the agent's tools. Default: empty.
+    /// - Throws: `ToolRegistryError.duplicateToolName` if duplicate tool names are provided.
+    init(
+        _ instructions: String,
+        provider: some InferenceProvider,
+        @ToolBuilder tools: () -> ToolCollection = { .empty }
+    ) throws {
+        try self.init(
+            tools: tools().storage,
+            instructions: instructions,
+            inferenceProvider: provider
+        )
+    }
+}
+
+// MARK: - V3 Modifiers
+
+public extension Agent {
+    /// Sets the memory system. Returns a new Agent with memory configured.
+    ///
+    /// ```swift
+    /// let agent = try Agent("Be helpful.")
+    ///     .withMemory(.conversation(maxMessages: 50))
+    /// ```
+    @discardableResult
+    public func withMemory(_ memory: some Memory) -> Agent {
+        var copy = self
+        copy.memory = memory
+        return copy
+    }
+
+    /// Sets the tracer for observability.
+    @discardableResult
+    public func withTracer(_ tracer: any Tracer) -> Agent {
+        var copy = self
+        copy.tracer = tracer
+        return copy
+    }
+
+    /// Sets input and/or output guardrails.
+    @discardableResult
+    public func withGuardrails(
+        input: [any InputGuardrail] = [],
+        output: [any OutputGuardrail] = []
+    ) -> Agent {
+        var copy = self
+        if !input.isEmpty { copy.inputGuardrails = input }
+        if !output.isEmpty { copy.outputGuardrails = output }
+        return copy
+    }
+
+    /// Sets handoff agents for multi-agent orchestration.
+    @discardableResult
+    public func withHandoffs(_ agents: [any AgentRuntime]) -> Agent {
+        var copy = self
+        copy._handoffs = agents.map { agent in
+            AnyHandoffConfiguration(
+                targetAgent: agent,
+                toolNameOverride: nil,
+                toolDescription: nil
+            )
+        }
+        return copy
+    }
+
+    /// Replaces the tool set with the given array of `any Tool`.
+    @discardableResult
+    public func withTools(_ tools: [any Tool]) -> Agent {
+        var copy = self
+        let bridged = tools.map { bridgeToolToAnyJSON($0) }
+        copy.tools = bridged
+        copy.toolRegistry = (try? ToolRegistry(tools: bridged)) ?? ToolRegistry()
+        return copy
+    }
+
+    /// Replaces the tool set using a `@ToolBuilder` closure.
+    @discardableResult
+    public func withTools(@ToolBuilder _ builder: () -> ToolCollection) -> Agent {
+        var copy = self
+        let storage = builder().storage
+        copy.tools = storage
+        copy.toolRegistry = (try? ToolRegistry(tools: storage)) ?? ToolRegistry()
+        return copy
+    }
+
+    /// Sets the agent configuration.
+    @discardableResult
+    public func withConfiguration(_ config: AgentConfiguration) -> Agent {
+        var copy = self
+        copy.configuration = config
+        return copy
+    }
+
+    /// Executes the agent using function-call syntax.
+    ///
+    /// This sugar lets you invoke the agent as if it were a function:
+    /// ```swift
+    /// let result = try await agent("Summarize this document.")
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - input: The user's input/query.
+    ///   - session: Optional session for conversation history management. Default: nil
+    ///   - observer: Optional observer for lifecycle callbacks. Default: nil
+    /// - Returns: The result of the agent's execution.
+    /// - Throws: `AgentError` if execution fails, or `GuardrailError` if guardrails trigger.
+    public func callAsFunction(
+        _ input: String,
+        session: (any Session)? = nil,
+        observer: (any AgentObserver)? = nil
+    ) async throws -> AgentResult {
+        try await run(input, session: session, observer: observer)
     }
 }

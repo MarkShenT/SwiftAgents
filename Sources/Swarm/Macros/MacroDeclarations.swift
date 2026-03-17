@@ -80,7 +80,10 @@
 /// - `let parameters: [ToolParameter]` - From `@Parameter` annotated properties
 /// - `init()` - If not already present
 /// - `execute(arguments:)` - Wrapper that extracts parameters and calls your execute()
-/// - `AnyJSONTool` and `Sendable` conformance
+/// - `Input` - Codable input struct with all @Parameter properties
+/// - `Output` - Typealias for your execute() return type
+/// - `execute(_:)` - Typed execute conforming to the Tool protocol
+/// - `Tool`, `AnyJSONTool`, and `Sendable` conformance
 ///
 /// ## Requirements
 ///
@@ -89,9 +92,10 @@
 /// - Parameters should be annotated with `@Parameter`
 @attached(
     member,
-    names: named(name), named(description), named(parameters), named(init), named(execute), named(_userExecute)
+    names: named(name), named(description), named(parameters), named(init), named(execute), named(_userExecute),
+    named(Input), named(Output)
 )
-@attached(extension, conformances: AnyJSONTool, Sendable)
+@attached(extension, conformances: Tool, Sendable)
 public macro Tool(_ description: String) = #externalMacro(module: "SwarmMacros", type: "ToolMacro")
 
 // MARK: - @Parameter Macro
@@ -346,6 +350,50 @@ public struct PromptString: Sendable, ExpressibleByStringLiteral, ExpressibleByS
         interpolations = []
     }
 }
+
+// MARK: - #Tool Macro (Inline Tool)
+
+/// Creates an inline tool from a closure with labeled parameters.
+///
+/// The `#Tool` macro generates a complete `Tool`-conforming struct from a closure,
+/// eliminating the need to define a named struct for simple, one-off tools.
+///
+/// ## Usage
+///
+/// ```swift
+/// let greetTool = #Tool("greet", "Says hello to a person") { (name: String, age: Int) in
+///     "Hello, \(name)! You are \(age) years old."
+/// }
+/// ```
+///
+/// ## Generated Code
+///
+/// The macro generates:
+/// - A `Codable & Sendable` input struct with one stored property per closure parameter
+/// - A `Tool`-conforming struct with `name`, `description`, `parameters`, and `execute(_:)`
+/// - An IIFE (immediately invoked closure) that returns the tool instance
+///
+/// ## Type Mapping
+///
+/// | Closure parameter type | ToolParameter type |
+/// |------------------------|--------------------|
+/// | `String` | `.string` |
+/// | `Int` | `.int` |
+/// | `Double` / `Float` | `.double` |
+/// | `Bool` | `.bool` |
+/// | `T?` | Same as T, `isRequired: false` |
+///
+/// ## Relationship to @Tool
+///
+/// `@Tool` is the attached macro for named, reusable tool structs.
+/// `#Tool` is the freestanding expression macro for inline, anonymous tools.
+/// They share the name `Tool` but are distinguished by sigil (`@` vs `#`) and
+/// parameter count (one string vs two strings), so Swift resolves them unambiguously.
+@freestanding(expression)
+public macro Tool(
+    _ name: String,
+    _ description: String
+) = #externalMacro(module: "SwarmMacros", type: "InlineToolMacro")
 
 // MARK: - @Builder Macro
 

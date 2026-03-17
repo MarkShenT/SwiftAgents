@@ -48,36 +48,9 @@ public protocol InputGuardrail: Guardrail {
     func validate(_ input: String, context: AgentContext?) async throws -> GuardrailResult
 }
 
-// MARK: - ClosureInputGuardrail
-
-/// A closure-based implementation of `InputGuardrail`.
-///
-/// `ClosureInputGuardrail` wraps a validation closure, allowing for quick guardrail creation
-/// without defining a new type. The closure receives the input and optional context, and
-/// returns a `GuardrailResult`.
-///
-/// This is particularly useful for:
-/// - Prototyping guardrails quickly
-/// - Simple validation logic
-/// - Dynamic guardrail creation
-/// - Testing scenarios
-///
-/// Example:
-/// ```swift
-/// let lengthGuardrail = ClosureInputGuardrail(name: "MaxLength") { input, context in
-///     if input.count > 1000 {
-///         return .tripwire(message: "Input exceeds maximum length")
-///     }
-///     return .passed()
-/// }
-///
-/// let result = try await lengthGuardrail.validate("user input", context: nil)
-/// ```
 // MARK: - InputGuard
 
 /// A lightweight, closure-based `InputGuardrail` with a concise API.
-///
-/// Prefer `InputGuard` over `ClosureInputGuardrail` for new code.
 public struct InputGuard: InputGuardrail, Sendable {
     public let name: String
 
@@ -165,5 +138,27 @@ public extension InputGuard {
         _ validate: @escaping @Sendable (String) async throws -> GuardrailResult
     ) -> InputGuard {
         InputGuard(name, validate)
+    }
+}
+
+// MARK: - V3 Protocol Factory Extensions
+
+extension InputGuardrail where Self == InputGuard {
+    /// Creates a max-length input guardrail.
+    public static func maxLength(_ maxLength: Int, name: String = "MaxLengthGuardrail") -> InputGuard {
+        InputGuard.maxLength(maxLength, name: name)
+    }
+
+    /// Creates a not-empty input guardrail.
+    public static func notEmpty(name: String = "NotEmptyGuardrail") -> InputGuard {
+        InputGuard.notEmpty(name: name)
+    }
+
+    /// Creates a custom input guardrail.
+    public static func custom(
+        _ name: String,
+        _ validate: @escaping @Sendable (String) async throws -> GuardrailResult
+    ) -> InputGuard {
+        InputGuard.custom(name, validate)
     }
 }
