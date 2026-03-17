@@ -116,9 +116,15 @@ public struct ToolMacro: MemberMacro, ExtensionMacro {
                 """)
         }
 
-        // 5. Generate execute(arguments:) wrapper
-        let executeWrapper = generateExecuteWrapper(parameters: parameters, declaration: declaration)
-        members.append(executeWrapper)
+        // 5. Generate Tool protocol members: Input struct, Output typealias, typed execute
+        let userReturnType = extractUserExecuteReturnType(from: declaration)
+        let inputStruct = generateInputStruct(parameters: parameters)
+        members.append(inputStruct)
+        members.append("""
+            public typealias Output = \(raw: userReturnType)
+            """)
+        let typedExecute = generateTypedExecute(parameters: parameters, returnType: userReturnType)
+        members.append(typedExecute)
 
         return members
     }
@@ -138,8 +144,8 @@ public struct ToolMacro: MemberMacro, ExtensionMacro {
               extractDescription(from: node) != nil else {
             return []
         }
-        // Add AnyJSONTool and Sendable conformance
-        let toolExtension = try ExtensionDeclSyntax("extension \(type): AnyJSONTool, Sendable {}")
+        // Add Tool and Sendable conformance (AnyJSONTool bridging is handled by AnyJSONToolAdapter)
+        let toolExtension = try ExtensionDeclSyntax("extension \(type): Tool, Sendable {}")
         return [toolExtension]
     }
 
@@ -490,6 +496,97 @@ do {
                 }
 """
         }
+    }
+    // MARK: - Tool Protocol Member Generation
+
+    /// Extracts the return type of the user's execute() method.
+    private static func extractUserExecuteReturnType(from declaration: some DeclGroupSyntax) -> String {
+        for member in declaration.memberBlock.members {
+            if let funcDecl = member.decl.as(FunctionDeclSyntax.self),
+               funcDecl.name.text == "execute",
+               funcDecl.signature.parameterClause.parameters.isEmpty {
+                if let returnClause = funcDecl.signature.returnClause {
+                    return returnClause.type.description.trimmingCharacters(in: .whitespaces)
+                }
+                return "Void"
+            }
+        }
+        return "Void"
+    }
+
+    /// Generates the nested `Input` struct conforming to `Codable & Sendable`.
+    private static func generateInputStruct(parameters: [ParameterInfo]) -> DeclSyntax {
+        if parameters.isEmpty {
+            return """
+                public struct Input: Codable, Sendable {
+                }
+                """
+        }
+
+        let properties = parameters.map { param -> String in
+            let swiftType: String
+            if param.isOptional && !param.swiftType.hasSuffix("?") {
+                swiftType = param.swiftType + "?"
+            } else {
+                swiftType = param.swiftType
+            }
+            if let defaultValue = param.defaultValue {
+                return "    public var \(param.name): \(swiftType) = \(defaultValue)"
+            } else {
+                return "    public var \(param.name): \(swiftType)"
+            }
+        }.joined(separator: "\n")
+
+        return """
+            public struct Input: Codable, Sendable {
+            \(raw: properties)
+            }
+            """
+    }
+
+    /// Generates the typed `execute(_ input: Input) async throws -> Output` method.
+    private static func generateTypedExecute(parameters: [ParameterInfo], returnType: String) -> DeclSyntax {
+        if parameters.isEmpty {
+            let conversion = generateTypedReturnConversion(returnType)
+            return """
+                public func execute(_ input: Input) async throws -> Output {
+                    var toolCopy = self
+                    \(raw: conversion)
+                }
+                """
+        }
+
+        // For optional params (those with defaults), the Input property is Optional<T>.
+        // When assigning back to a non-optional property, use nil-coalescing with the default value.
+        let assignments = parameters.map { param -> String in
+            // Input property is optional when param is optional AND the swift type doesn't already end with ?
+            let inputIsOptional = param.isOptional && !param.swiftType.hasSuffix("?")
+            if inputIsOptional, let defaultValue = param.defaultValue {
+                return "toolCopy.\(param.name) = input.\(param.name) ?? \(defaultValue)"
+            } else {
+                return "toolCopy.\(param.name) = input.\(param.name)"
+            }
+        }.joined(separator: "\n        ")
+
+        let conversion = generateTypedReturnConversion(returnType)
+
+        return """
+            public func execute(_ input: Input) async throws -> Output {
+                var toolCopy = self
+                \(raw: assignments)
+                \(raw: conversion)
+            }
+            """
+    }
+
+    /// Generates the return statement for the typed execute method.
+    /// For most types the user's execute() IS the Output, so we just return it directly.
+    private static func generateTypedReturnConversion(_ returnType: String) -> String {
+        let clean = returnType.trimmingCharacters(in: .whitespaces)
+        if clean == "Void" || clean == "()" {
+            return "try await toolCopy.execute()"
+        }
+        return "return try await toolCopy.execute()"
     }
 }
 
