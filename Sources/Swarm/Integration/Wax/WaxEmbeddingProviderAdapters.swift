@@ -25,10 +25,6 @@ public struct SwarmEmbeddingProviderAdapter: EmbeddingProvider {
     }
 
     public func embed(_ texts: [String]) async throws -> [[Float]] {
-        if let batch = base as? any WaxVectorSearch.BatchEmbeddingProvider {
-            return try await batch.embed(batch: texts)
-        }
-
         var results: [[Float]] = []
         results.reserveCapacity(texts.count)
         for text in texts {
