@@ -10,7 +10,7 @@
 A standalone Swift CLI example app demonstrating Swarm's multi-agent capabilities. Three specialist agents analyze a Swift source file in parallel using Swarm's streaming API, with live colored terminal output. A fourth agent synthesizes their findings into a prioritized action list.
 
 **Primary audience:** Framework evaluators deciding whether to adopt Swarm.
-**Success criteria:** A developer can clone the repo, set one env var, and see three agents streaming interleaved analysis in under 60 seconds.
+**Success criteria:** A developer can clone the repo, set one env var, and see three agents streaming interleaved analysis in under 90 seconds (P50 network, `claude-3.5-sonnet` via OpenRouter).
 
 ---
 
@@ -57,13 +57,22 @@ Runner
 
 Three agents run as independent Swift `Task`s. Each consumes an `AsyncThrowingStream<AgentEvent, Error>` from `.stream()`, printing tokens with a colored ANSI prefix as they arrive. Tasks are collected via `TaskGroup`, awaiting all three before synthesis.
 
+**Streaming token pattern** (same for all four agents):
+```swift
+for try await event in agent.stream(code) {
+    if case .output(.token(let text)) = event {
+        StreamRenderer.print(text, prefix: "[Security]", color: .red)
+    }
+}
+```
+
 ---
 
 ## Components
 
 ### Agent Definitions
 
-All agents use the V3 canonical inline construction pattern.
+All agents use the V3 canonical inline construction pattern. All `Agent` inits are `throws` — construction uses `try Agent(...)`.
 
 **SecurityAgent** (`color: red 🔴`)
 Identifies: hardcoded secrets, force unwraps, injection vectors, insecure storage.
@@ -81,19 +90,23 @@ Receives all three reports as a single prompt. Outputs a final prioritized actio
 - **Should fix** — quality issues
 - **Consider** — style and polish
 
-All four agents share the same `InferenceProvider` (OpenRouter). Each specialist has its own `ConversationMemory(maxMessages: 10)`.
+Each specialist agent has its own `ConversationMemory(maxMessages: 10)`. All four agents are constructed with an equivalent `LLM.openRouter(key:model:)` provider — either a single value reused across all four inits, or constructed separately per agent (both are safe; `LLM` is a `Sendable` value type).
+
+### InferenceOptions
+
+Specialist agents use `InferenceOptions.precise` (temperature 0.2, no stop sequences). The `.codeGeneration` preset is explicitly avoided — its `stopSequences: ["```", "###"]` would truncate analysis output whenever the model quotes code in a markdown fence.
 
 ### Provider
 
 ```swift
-.openRouter(key: apiKey, model: model)
+LLM.openRouter(key: apiKey, model: model)
 ```
 
 Default model: `anthropic/claude-3.5-sonnet`. Configurable via `--model` flag or `OPENROUTER_MODEL` env var.
 
 ### ReadFileTool
 
-A lightweight `AnyJSONTool` conformance that reads a file path from disk and returns its contents as a `String`. Used internally by `Runner` before fan-out (not passed to agents — file contents are injected directly into the prompt).
+A `Tool` protocol conformance with a `@Parameter` file path property. Reads a file from disk and returns its contents as a `String`. Used internally by `Runner` before fan-out — file contents are injected directly into the prompt, not passed as a live tool to agents.
 
 ### StreamRenderer
 
@@ -109,7 +122,9 @@ Prints are unbuffered (`fflush(stdout)` after each token) for real-time streamin
 
 ### Guardrails
 
-`NotEmptyGuardrail` on the synthesizer's input — catches empty analysis results before wasting an API call on synthesis. No output guardrails.
+`InputGuard.notEmpty()` on the synthesizer's input — catches empty analysis results before wasting an API call on synthesis. No output guardrails.
+
+The synthesizer's `AgentConfiguration` sets `timeout` to 120 seconds (overriding the default 60s) to accommodate the larger combined input prompt.
 
 ---
 
@@ -131,6 +146,7 @@ swift run CodeReviewer <file> [--model <model-id>] [--key <api-key>]
 | File not found | `❌  File not found: <path>` |
 | No API key | `❌  OPENROUTER_API_KEY not set. Get a key at openrouter.ai` |
 | Agent failure | `[Security] ⚠️  Analysis failed: <reason>. Skipping.` (non-fatal) |
+| Guardrail trip | `❌  All specialist analyses returned empty. Cannot synthesize.` |
 
 Individual agent failures are caught and reported inline — one failure does not abort the others.
 
@@ -140,14 +156,14 @@ Individual agent failures are caught and reported inline — one failure does no
 
 | Feature | Where Used |
 |---|---|
-| `Agent` inline construction | All four agent files |
-| `.stream()` + `AgentEvent` | `Runner.swift` streaming loop |
+| `Agent` inline construction (`try Agent(...)`) | All four agent files |
+| `.stream()` + `.output(.token(...))` event | `Runner.swift` streaming loop |
 | Parallel `TaskGroup` | `Runner.swift` fan-out |
 | `ConversationMemory` | Each specialist agent |
-| `NotEmptyGuardrail` | `SynthesizerAgent` |
-| `.openRouter(key:model:)` | Provider factory |
-| `AgentConfiguration` (name) | All agents |
-| `InferenceOptions` (.codeGeneration preset) | Specialist agents |
+| `InputGuard.notEmpty()` | `SynthesizerAgent` |
+| `LLM.openRouter(key:model:)` | Provider factory |
+| `AgentConfiguration` (name, timeout) | All agents |
+| `InferenceOptions.precise` | Specialist agents |
 
 ---
 
@@ -160,9 +176,10 @@ Individual agent failures are caught and reported inline — one failure does no
 |---|---|
 | `ReadFileTool` reads fixture | File I/O correctness |
 | `StreamRenderer` formatting | ANSI prefix output |
-| All four agents initialize | No-throw construction |
+| All four agents initialize without throwing | `try Agent(...)` construction |
 | Runner fails on missing key | Fast-fail error path |
 | Runner fails on missing file | Fast-fail error path |
+| Synthesizer guardrail trips on empty input | `InputGuard.notEmpty()` fires correctly |
 
 LLM output and live streaming are explicitly out of scope for unit tests.
 
@@ -171,7 +188,7 @@ LLM output and live streaming are explicitly out of scope for unit tests.
 ## Out of Scope
 
 - GitHub PR / git diff input (future example)
-- MiniMax native provider (use OpenRouter passthrough)
+- MiniMax native provider (use OpenRouter passthrough: `model: "minimax/minimax-01"`)
 - Interactive TUI / web UI
 - Saving reports to disk
 - CI integration
