@@ -1,11 +1,17 @@
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+private typealias ConduitToolChoice = ConduitAdvanced.ToolChoice
+#else
 import Conduit
+private typealias ConduitToolChoice = Conduit.ToolChoice
+#endif
 import Foundation
 
 /// Bridges a Conduit TextGenerator into Swarm' InferenceProvider.
 ///
 /// This adapter keeps tool execution in Swarm by returning tool calls
 /// upstream, avoiding Conduit's internal ToolExecutor.
-struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvider,
+struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
     ToolCallStreamingInferenceProvider,
     CapabilityReportingInferenceProvider,
     ConversationInferenceProvider,
@@ -17,7 +23,7 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
     init(
         provider: Provider,
         model: Provider.ModelID,
-        baseConfig: Conduit.GenerateConfig = .default
+        baseConfig: GenerateConfig = .default
     ) {
         self.provider = provider
         self.model = model
@@ -39,7 +45,7 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
     }
 
     func stream(prompt: String, options: InferenceOptions) -> AsyncThrowingStream<String, Error> {
-        let config: Conduit.GenerateConfig
+        let config: GenerateConfig
         do {
             config = try apply(options: options, to: baseConfig)
         } catch {
@@ -92,21 +98,21 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
         config = config.tools(toolDefinitions)
 
         if !tools.isEmpty, let toolChoice = options.toolChoice {
-            let conduitToolChoice: Conduit.ToolChoice = switch toolChoice {
+            let conduitToolChoice: ConduitToolChoice = switch toolChoice {
                 case .auto:
-                    .auto
+                    ConduitToolChoice.auto
                 case .none:
-                    .none
+                    ConduitToolChoice.none
                 case .required:
-                    .required
+                    ConduitToolChoice.required
                 case .specific(let toolName):
-                    .tool(name: toolName)
+                    ConduitToolChoice.tool(name: toolName)
                 }
             config = config.toolChoice(conduitToolChoice)
         }
 
         let result = try await provider.generate(
-            messages: [Conduit.Message.user(prompt)],
+            messages: [Message.user(prompt)],
             model: model,
             config: config
         )
@@ -138,15 +144,15 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
         config = config.tools(toolDefinitions)
 
         if !tools.isEmpty, let toolChoice = options.toolChoice {
-            let conduitToolChoice: Conduit.ToolChoice = switch toolChoice {
+            let conduitToolChoice: ConduitToolChoice = switch toolChoice {
                 case .auto:
-                    .auto
+                    ConduitToolChoice.auto
                 case .none:
-                    .none
+                    ConduitToolChoice.none
                 case .required:
-                    .required
+                    ConduitToolChoice.required
                 case .specific(let toolName):
-                    .tool(name: toolName)
+                    ConduitToolChoice.tool(name: toolName)
                 }
             config = config.toolChoice(conduitToolChoice)
         }
@@ -186,15 +192,15 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
             config = config.tools(toolDefinitions)
 
             if !tools.isEmpty, let toolChoice = options.toolChoice {
-                let conduitToolChoice: Conduit.ToolChoice = switch toolChoice {
+                let conduitToolChoice: ConduitToolChoice = switch toolChoice {
                     case .auto:
-                        .auto
+                        ConduitToolChoice.auto
                     case .none:
-                        .none
+                        ConduitToolChoice.none
                     case .required:
-                        .required
+                        ConduitToolChoice.required
                     case .specific(let toolName):
-                        .tool(name: toolName)
+                        ConduitToolChoice.tool(name: toolName)
                     }
                 config = config.toolChoice(conduitToolChoice)
             }
@@ -202,7 +208,7 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
             var lastFragmentByCallId: [String: String] = [:]
 
             let chunkStream = provider.streamWithMetadata(
-                messages: [Conduit.Message.user(prompt)],
+                messages: [Message.user(prompt)],
                 model: model,
                 config: config
             )
@@ -276,15 +282,15 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
             config = config.tools(toolDefinitions)
 
             if !tools.isEmpty, let toolChoice = options.toolChoice {
-                let conduitToolChoice: Conduit.ToolChoice = switch toolChoice {
+                let conduitToolChoice: ConduitToolChoice = switch toolChoice {
                     case .auto:
-                        .auto
+                        ConduitToolChoice.auto
                     case .none:
-                        .none
+                        ConduitToolChoice.none
                     case .required:
-                        .required
+                        ConduitToolChoice.required
                     case .specific(let toolName):
-                        .tool(name: toolName)
+                        ConduitToolChoice.tool(name: toolName)
                     }
                 config = config.toolChoice(conduitToolChoice)
             }
@@ -339,9 +345,9 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
 
     private let provider: Provider
     private let model: Provider.ModelID
-    private let baseConfig: Conduit.GenerateConfig
+    private let baseConfig: GenerateConfig
 
-    private static func conduitMessages(from messages: [InferenceMessage]) throws -> [Conduit.Message] {
+    private static func conduitMessages(from messages: [InferenceMessage]) throws -> [Message] {
         let toolNamesByCallID = Dictionary(
             uniqueKeysWithValues: messages
                 .flatMap(\.toolCalls)
@@ -358,7 +364,7 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
     private static func conduitMessage(
         from message: InferenceMessage,
         toolNamesByCallID: [String: String]
-    ) throws -> Conduit.Message {
+    ) throws -> Message {
         switch message.role {
         case .system:
             return .system(message.content)
@@ -381,7 +387,7 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
             }
 
             return .toolOutput(
-                Conduit.Transcript.ToolOutput(
+                Transcript.ToolOutput(
                     id: toolCallID,
                     toolName: toolName,
                     segments: [.text(.init(content: message.content))]
@@ -390,11 +396,11 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
         }
     }
 
-    private static func conduitToolCall(from toolCall: InferenceMessage.ToolCall) throws -> Conduit.Transcript.ToolCall {
+    private static func conduitToolCall(from toolCall: InferenceMessage.ToolCall) throws -> Transcript.ToolCall {
         let jsonObject = try jsonObject(from: .dictionary(toolCall.arguments))
         let data = try JSONSerialization.data(withJSONObject: jsonObject, options: [.sortedKeys])
         let json = String(decoding: data, as: UTF8.self)
-        return try Conduit.Transcript.ToolCall(
+        return try Transcript.ToolCall(
             id: toolCall.id ?? UUID().uuidString,
             toolName: toolCall.name,
             argumentsJSON: json
@@ -420,7 +426,7 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
         }
     }
 
-    private func apply(options: InferenceOptions, to config: Conduit.GenerateConfig) throws -> Conduit.GenerateConfig {
+    private func apply(options: InferenceOptions, to config: GenerateConfig) throws -> GenerateConfig {
         var updated = config
 
         updated = updated.temperature(Float(options.temperature))
@@ -470,8 +476,8 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
 
     private func applyProviderRuntimeSettings(
         _ providerSettings: [String: SendableValue],
-        to config: Conduit.GenerateConfig
-    ) throws -> Conduit.GenerateConfig {
+        to config: GenerateConfig
+    ) throws -> GenerateConfig {
         let unsupportedRuntimeKeys = providerSettings.keys
             .filter { $0.hasPrefix("conduit.runtime.") }
             .sorted()
@@ -488,7 +494,7 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
 
     private static func conduitResponseFormat(
         from format: StructuredOutputFormat
-    ) throws -> Conduit.ResponseFormat {
+    ) throws -> ResponseFormat {
         switch format {
         case .jsonObject:
             return .jsonObject
@@ -497,7 +503,7 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
                 throw AgentError.generationFailed(reason: "Structured output schema is not valid UTF-8")
             }
             do {
-                let schema = try JSONDecoder().decode(Conduit.GenerationSchema.self, from: data)
+                let schema = try JSONDecoder().decode(GenerationSchema.self, from: data)
                 return .jsonSchema(name: name, schema: schema)
             } catch {
                 throw AgentError.generationFailed(
@@ -556,7 +562,7 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
     }
 
     private func mapFinishReason(
-        _ reason: Conduit.FinishReason,
+        _ reason: FinishReason,
         toolCalls: [InferenceResponse.ParsedToolCall]
     ) -> InferenceResponse.FinishReason {
         if reason.isToolCallRequest || !toolCalls.isEmpty {
@@ -579,10 +585,10 @@ struct ConduitInferenceProvider<Provider: Conduit.TextGenerator>: InferenceProvi
 // MARK: - Tool Schema Conversion
 
 enum ConduitToolSchemaConverter {
-    static func toolDefinitions(from tools: [ToolSchema]) throws -> [Conduit.Transcript.ToolDefinition] {
+    static func toolDefinitions(from tools: [ToolSchema]) throws -> [Transcript.ToolDefinition] {
         try tools.map { tool in
             let schema = try generationSchema(for: tool)
-            return Conduit.Transcript.ToolDefinition(
+            return Transcript.ToolDefinition(
                 name: tool.name,
                 description: tool.description,
                 parameters: schema
@@ -590,14 +596,14 @@ enum ConduitToolSchemaConverter {
         }
     }
 
-    static func generationSchema(for tool: ToolSchema) throws -> Conduit.GenerationSchema {
+    static func generationSchema(for tool: ToolSchema) throws -> GenerationSchema {
         let rootName = SchemaName.rootName(for: tool.name)
         let properties = try tool.parameters.map { parameter in
             let schema = try dynamicSchema(
                 for: parameter.type,
                 name: SchemaName.propertyName(root: rootName, property: parameter.name)
             )
-            return Conduit.DynamicGenerationSchema.Property(
+            return DynamicGenerationSchema.Property(
                 name: parameter.name,
                 description: parameter.description,
                 schema: schema,
@@ -605,31 +611,31 @@ enum ConduitToolSchemaConverter {
             )
         }
 
-        let root = Conduit.DynamicGenerationSchema(
+        let root = DynamicGenerationSchema(
             name: rootName,
             description: "Tool parameters for \(tool.name)",
             properties: properties
         )
 
-        return try Conduit.GenerationSchema(root: root, dependencies: [])
+        return try GenerationSchema(root: root, dependencies: [])
     }
 
     private static func dynamicSchema(
         for type: ToolParameter.ParameterType,
         name: String
-    ) throws -> Conduit.DynamicGenerationSchema {
+    ) throws -> DynamicGenerationSchema {
         switch type {
         case .string:
-            return Conduit.DynamicGenerationSchema(type: String.self)
+            return DynamicGenerationSchema(type: String.self)
         case .int:
-            return Conduit.DynamicGenerationSchema(type: Int.self)
+            return DynamicGenerationSchema(type: Int.self)
         case .double:
-            return Conduit.DynamicGenerationSchema(type: Double.self)
+            return DynamicGenerationSchema(type: Double.self)
         case .bool:
-            return Conduit.DynamicGenerationSchema(type: Bool.self)
+            return DynamicGenerationSchema(type: Bool.self)
         case .array(let elementType):
             let elementSchema = try dynamicSchema(for: elementType, name: SchemaName.childName(base: name, suffix: "item"))
-            return Conduit.DynamicGenerationSchema(arrayOf: elementSchema)
+            return DynamicGenerationSchema(arrayOf: elementSchema)
         case .object(let properties):
             let objectName = SchemaName.objectName(for: name)
             let objectProperties = try properties.map { parameter in
@@ -637,32 +643,32 @@ enum ConduitToolSchemaConverter {
                     for: parameter.type,
                     name: SchemaName.childName(base: objectName, suffix: parameter.name)
                 )
-                return Conduit.DynamicGenerationSchema.Property(
+                return DynamicGenerationSchema.Property(
                     name: parameter.name,
                     description: parameter.description,
                     schema: schema,
                     isOptional: !parameter.isRequired
                 )
             }
-            return Conduit.DynamicGenerationSchema(
+            return DynamicGenerationSchema(
                 name: objectName,
                 description: nil,
                 properties: objectProperties
             )
         case .oneOf(let options):
-            return Conduit.DynamicGenerationSchema(
+            return DynamicGenerationSchema(
                 name: SchemaName.enumName(for: name),
                 description: nil,
                 anyOf: options
             )
         case .any:
-            return Conduit.DynamicGenerationSchema(
+            return DynamicGenerationSchema(
                 name: SchemaName.anyName(for: name),
                 description: nil,
                 anyOf: [
-                    Conduit.DynamicGenerationSchema(type: String.self),
-                    Conduit.DynamicGenerationSchema(type: Double.self),
-                    Conduit.DynamicGenerationSchema(type: Bool.self)
+                    DynamicGenerationSchema(type: String.self),
+                    DynamicGenerationSchema(type: Double.self),
+                    DynamicGenerationSchema(type: Bool.self)
                 ]
             )
         }
@@ -706,13 +712,13 @@ enum ConduitToolSchemaConverter {
 
 enum ConduitToolCallConverter {
     static func toParsedToolCalls(
-        _ toolCalls: [Conduit.Transcript.ToolCall]
+        _ toolCalls: [Transcript.ToolCall]
     ) throws -> [InferenceResponse.ParsedToolCall] {
         try toolCalls.map { try toParsedToolCall($0) }
     }
 
     static func toParsedToolCall(
-        _ toolCall: Conduit.Transcript.ToolCall
+        _ toolCall: Transcript.ToolCall
     ) throws -> InferenceResponse.ParsedToolCall {
         let arguments = try parseArguments(toolCall.arguments, toolName: toolCall.toolName)
         return InferenceResponse.ParsedToolCall(
@@ -723,7 +729,7 @@ enum ConduitToolCallConverter {
     }
 
     private static func parseArguments(
-        _ content: Conduit.GeneratedContent,
+        _ content: GeneratedContent,
         toolName: String
     ) throws -> [String: SendableValue] {
         let jsonString = content.jsonString

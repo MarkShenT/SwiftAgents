@@ -1,4 +1,9 @@
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+#else
 import Conduit
+#endif
+import Foundation
 import Testing
 @testable import Swarm
 
@@ -86,4 +91,92 @@ struct LLMPresetsTests {
             }
         }
     }
+
+    @Test("LLM OpenRouter preset preserves routing metadata")
+    func llmOpenRouterPresetPreservesRoutingMetadata() throws {
+        let url = try #require(URL(string: "https://swarm.dev"))
+        let preset = LLM.openRouter(apiKey: "test-key", model: "anthropic/claude-3-opus") { routing in
+            routing.providers = [.anthropic]
+            routing.siteURL = url
+            routing.appName = "Swarm"
+            routing.dataCollection = .deny
+        }
+
+        let provider = preset._makeProviderForTesting()
+        let metadata = try #require(mirroredOpenRouterMetadata(from: provider))
+        #expect(metadata.siteURL == url)
+        #expect(metadata.appName == "Swarm")
+        #expect(metadata.dataCollectionDescription?.contains("deny") == true)
+    }
+
+    @Test("LLM Ollama preset preserves advanced settings")
+    func llmOllamaPresetPreservesAdvancedSettings() throws {
+        let preset = LLM.ollama("llama3.2") { settings in
+            settings.host = "127.0.0.1"
+            settings.port = 11435
+            settings.keepAlive = "10m"
+            settings.pullOnMissing = true
+            settings.numGPU = 2
+            settings.lowVRAM = true
+            settings.numCtx = 4096
+            settings.healthCheck = false
+        }
+
+        let provider = preset._makeProviderForTesting()
+        let configuration = try #require(mirroredOllamaConfiguration(from: provider))
+        #expect(configuration.keepAlive == "10m")
+        #expect(configuration.pullOnMissing == true)
+        #expect(configuration.numGPU == 2)
+        #expect(configuration.lowVRAM == true)
+        #expect(configuration.numCtx == 4096)
+        #expect(configuration.healthCheck == false)
+    }
+}
+
+private func mirroredOpenRouterMetadata(from provider: Any) -> (siteURL: URL?, appName: String?, dataCollectionDescription: String?)? {
+    guard let rawProvider = unwrapMirrorOptional(Mirror(reflecting: provider).descendant("provider")),
+          let configuration = unwrapMirrorOptional(Mirror(reflecting: rawProvider).descendant("configuration")),
+          let openRouterConfig = unwrapMirrorOptional(Mirror(reflecting: configuration).descendant("openRouterConfig"))
+    else {
+        return nil
+    }
+
+    let mirror = Mirror(reflecting: openRouterConfig)
+    let siteURL = unwrapMirrorOptional(mirror.descendant("siteURL")) as? URL
+    let appName = unwrapMirrorOptional(mirror.descendant("appName")) as? String
+    let dataCollection = unwrapMirrorOptional(mirror.descendant("dataCollection"))
+    return (siteURL, appName, dataCollection.map { String(describing: $0) })
+}
+
+private func mirroredOllamaConfiguration(from provider: Any) -> (
+    keepAlive: String?,
+    pullOnMissing: Bool?,
+    numGPU: Int?,
+    lowVRAM: Bool?,
+    numCtx: Int?,
+    healthCheck: Bool?
+)? {
+    guard let rawProvider = unwrapMirrorOptional(Mirror(reflecting: provider).descendant("provider")),
+          let configuration = unwrapMirrorOptional(Mirror(reflecting: rawProvider).descendant("configuration")),
+          let ollamaConfig = unwrapMirrorOptional(Mirror(reflecting: configuration).descendant("ollamaConfig"))
+    else {
+        return nil
+    }
+
+    let mirror = Mirror(reflecting: ollamaConfig)
+    return (
+        unwrapMirrorOptional(mirror.descendant("keepAlive")) as? String,
+        unwrapMirrorOptional(mirror.descendant("pullOnMissing")) as? Bool,
+        unwrapMirrorOptional(mirror.descendant("numGPU")) as? Int,
+        unwrapMirrorOptional(mirror.descendant("lowVRAM")) as? Bool,
+        unwrapMirrorOptional(mirror.descendant("numCtx")) as? Int,
+        unwrapMirrorOptional(mirror.descendant("healthCheck")) as? Bool
+    )
+}
+
+private func unwrapMirrorOptional(_ value: Any?) -> Any? {
+    guard let value else { return nil }
+    let mirror = Mirror(reflecting: value)
+    guard mirror.displayStyle == .optional else { return value }
+    return mirror.children.first?.value
 }

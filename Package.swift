@@ -3,7 +3,9 @@ import PackageDescription
 import CompilerPluginSupport
 import Foundation
 
+let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let includeDemo = ProcessInfo.processInfo.environment["SWARM_INCLUDE_DEMO"] == "1"
+let useLocalDeps = ProcessInfo.processInfo.environment["AISTACK_USE_LOCAL_DEPS"] == "1"
 
 var packageProducts: [Product] = [
     .library(name: "Swarm", targets: ["Swarm"]),
@@ -18,33 +20,57 @@ if includeDemo {
 }
 
 var packageDependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/swiftlang/swift-syntax.git", "600.0.0"..<"603.0.0"),
-    .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
-    .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.10.0"),
-    .package(url: "https://github.com/christopherkarani/Wax.git", from: "0.1.17"),
-    .package(
-        url: "https://github.com/christopherkarani/Conduit",
-        exact: "0.3.5",
-        traits: [
-            .trait(name: "OpenAI"),
-            .trait(name: "OpenRouter"),
-            .trait(name: "Anthropic"),
-        ]
-    ),
-    .package(url: "https://github.com/christopherkarani/Membrane", from: "0.1.1"),
+    .package(url: "https://github.com/swiftlang/swift-syntax.git", "600.0.0"..<"601.0.0"),
+    .package(url: "https://github.com/apple/swift-log.git", from: "1.10.1"),
+    .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.11.0"),
+    .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.13.2"),
 ]
 
-packageDependencies.append(.package(url: "https://github.com/christopherkarani/Hive", from: "0.1.7"))
+if useLocalDeps {
+    packageDependencies += [
+        .package(path: packageRoot.appendingPathComponent("../Wax").path),
+        .package(
+            path: packageRoot.appendingPathComponent("../Conduit").path,
+            traits: [
+                .trait(name: "OpenAI"),
+                .trait(name: "OpenRouter"),
+                .trait(name: "Anthropic"),
+            ]
+        ),
+        .package(path: packageRoot.appendingPathComponent("../Membrane").path),
+        .package(path: packageRoot.appendingPathComponent("../Hive").path),
+    ]
+} else {
+    packageDependencies += [
+        .package(url: "https://github.com/christopherkarani/Wax.git", from: "0.1.18"),
+        .package(
+            url: "https://github.com/christopherkarani/Conduit",
+            exact: "0.3.5",
+            traits: [
+                .trait(name: "OpenAI"),
+                .trait(name: "OpenRouter"),
+                .trait(name: "Anthropic"),
+            ]
+        ),
+        .package(url: "https://github.com/christopherkarani/Membrane", from: "0.1.1"),
+        .package(url: "https://github.com/christopherkarani/Hive", from: "0.1.7"),
+    ]
+}
 
 var swarmDependencies: [Target.Dependency] = [
     "SwarmMacros",
     .product(name: "Logging", package: "swift-log"),
+    .product(name: "SwiftSoup", package: "SwiftSoup"),
     .product(name: "Wax", package: "Wax"),
     .product(name: "Conduit", package: "Conduit"),
     .product(name: "HiveCore", package: "Hive"),
     .product(name: "Membrane", package: "Membrane", condition: .when(traits: ["membrane"])),
     .product(name: "MembraneHive", package: "Membrane", condition: .when(traits: ["membrane"]))
 ]
+
+if useLocalDeps {
+    swarmDependencies.append(.product(name: "ConduitAdvanced", package: "Conduit"))
+}
 
 var swarmSwiftSettings: [SwiftSetting] = [
     .enableExperimentalFeature("StrictConcurrency"),
@@ -105,12 +131,20 @@ var packageTargets: [Target] = [
     // MARK: - Tests
     .testTarget(
         name: "SwarmTests",
-        dependencies: [
-            "Swarm",
-            "SwarmHive",
-            "SwarmMCP",
-            .product(name: "Conduit", package: "Conduit"),
-        ],
+        dependencies: {
+            var dependencies: [Target.Dependency] = [
+                "Swarm",
+                "SwarmHive",
+                "SwarmMCP",
+                .product(name: "Conduit", package: "Conduit"),
+                .product(name: "Membrane", package: "Membrane", condition: .when(traits: ["membrane"])),
+                .product(name: "MembraneCore", package: "Membrane", condition: .when(traits: ["membrane"])),
+            ]
+            if useLocalDeps {
+                dependencies.append(.product(name: "ConduitAdvanced", package: "Conduit"))
+            }
+            return dependencies
+        }(),
         resources: [
             .copy("Guardrails/INTEGRATION_TEST_SUMMARY.md"),
             .copy("Guardrails/QUICK_REFERENCE.md")

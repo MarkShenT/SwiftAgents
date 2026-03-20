@@ -28,6 +28,7 @@ public extension Swarm {
 
         private(set) var provider: (any InferenceProvider)?
         private(set) var cloud: (any InferenceProvider)?
+        private(set) var web: WebSearchTool.Configuration?
 
         func setProvider(_ provider: some InferenceProvider) {
             self.provider = provider
@@ -37,9 +38,14 @@ public extension Swarm {
             cloud = cloudProvider
         }
 
+        func setWebConfiguration(_ configuration: WebSearchTool.Configuration) {
+            web = configuration
+        }
+
         func reset() {
             provider = nil
             cloud = nil
+            web = nil
         }
     }
 
@@ -51,6 +57,11 @@ public extension Swarm {
     /// The currently configured higher-priority provider for tool-calling flows, if any.
     static var cloudProvider: (any InferenceProvider)? {
         get async { await Configuration.shared.cloud }
+    }
+
+    /// The currently configured default web-search configuration, if any.
+    static var webConfiguration: WebSearchTool.Configuration? {
+        get async { await Configuration.shared.web }
     }
 
     // MARK: - Public API
@@ -77,6 +88,17 @@ public extension Swarm {
     /// emulation path when available.
     static func configure(cloudProvider: some InferenceProvider) async {
         await Configuration.shared.setCloudProvider(cloudProvider)
+    }
+
+    /// Sets the default web-search configuration for all agents.
+    ///
+    /// Agents resolve web configuration in this order:
+    /// 1. Explicit `websearch` tool already attached to the agent
+    /// 2. TaskLocal via `.environment(\.webSearch, ...)`
+    /// 3. `Swarm.webConfiguration` (set here)
+    /// 4. No ambient web tool
+    static func configure(web configuration: WebSearchTool.Configuration) async {
+        await Configuration.shared.setWebConfiguration(configuration)
     }
 
     /// Resets all configuration. Intended for testing only.

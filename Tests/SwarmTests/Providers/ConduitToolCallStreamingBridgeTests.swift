@@ -1,4 +1,8 @@
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+#else
 import Conduit
+#endif
 import Testing
 @testable import Swarm
 
@@ -6,25 +10,25 @@ import Testing
 struct ConduitToolCallStreamingBridgeTests {
     @Test("Streams partial tool call fragments and completed calls through Swarm updates")
     func streamsToolCallAssembly() async throws {
-        struct MockModelID: Conduit.ModelIdentifying {
+        struct MockModelID: ModelIdentifying {
             let rawValue: String
             var displayName: String { rawValue }
-            var provider: Conduit.ProviderType { .openAI }
+            var provider: ProviderType { .openAI }
             var description: String { rawValue }
             init(_ rawValue: String) { self.rawValue = rawValue }
         }
 
-        struct MockTextGenerator: Conduit.TextGenerator {
+        struct MockTextGenerator: TextGenerator {
             typealias ModelID = MockModelID
 
-            let chunks: [Conduit.GenerationChunk]
+            let chunks: [GenerationChunk]
 
-            func generate(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) async throws -> String {
+            func generate(_ prompt: String, model _: ModelID, config _: GenerateConfig) async throws -> String {
                 ""
             }
 
-            func generate(messages _: [Conduit.Message], model _: ModelID, config _: Conduit.GenerateConfig) async throws -> Conduit.GenerationResult {
-                Conduit.GenerationResult(
+            func generate(messages _: [Message], model _: ModelID, config _: GenerateConfig) async throws -> GenerationResult {
+                GenerationResult(
                     text: "",
                     tokenCount: 0,
                     generationTime: 0,
@@ -33,17 +37,17 @@ struct ConduitToolCallStreamingBridgeTests {
                 )
             }
 
-            func stream(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) -> AsyncThrowingStream<String, Error> {
+            func stream(_ prompt: String, model _: ModelID, config _: GenerateConfig) -> AsyncThrowingStream<String, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
                 }
             }
 
             func streamWithMetadata(
-                messages _: [Conduit.Message],
+                messages _: [Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) -> AsyncThrowingStream<Conduit.GenerationChunk, Error> {
+                config _: GenerateConfig
+            ) -> AsyncThrowingStream<GenerationChunk, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     for chunk in chunks {
                         continuation.yield(chunk)
@@ -53,20 +57,20 @@ struct ConduitToolCallStreamingBridgeTests {
             }
         }
 
-        let partial = Conduit.PartialToolCall(
+        let partial = PartialToolCall(
             id: "call_1",
             toolName: "echo",
             index: 0,
             argumentsFragment: #"{"text":"#
         )
-        let callArgs = try Conduit.GeneratedContent(json: #"{"text":"hi"}"#)
-        let completedCall = Conduit.Transcript.ToolCall(id: "call_1", toolName: "echo", arguments: callArgs)
+        let callArgs = try GeneratedContent(json: #"{"text":"hi"}"#)
+        let completedCall = Transcript.ToolCall(id: "call_1", toolName: "echo", arguments: callArgs)
 
-        let chunks: [Conduit.GenerationChunk] = [
-            Conduit.GenerationChunk(text: "", partialToolCall: partial),
-            Conduit.GenerationChunk(
+        let chunks: [GenerationChunk] = [
+            GenerationChunk(text: "", partialToolCall: partial),
+            GenerationChunk(
                 text: "",
-                usage: Conduit.UsageStats(promptTokens: 3, completionTokens: 2),
+                usage: UsageStats(promptTokens: 3, completionTokens: 2),
                 completedToolCalls: [completedCall]
             ),
         ]

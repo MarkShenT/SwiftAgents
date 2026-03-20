@@ -1,4 +1,8 @@
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+#else
 import Conduit
+#endif
 import Testing
 @testable import Swarm
 
@@ -58,7 +62,7 @@ struct ConduitInferenceProviderBridgeTests {
     @Test("Converts Conduit tool calls into Swarm parsed tool calls")
     func convertsToolCall() throws {
         let arguments = try GeneratedContent(json: #"{"query":"swift","limit":3}"#)
-        let call = Conduit.Transcript.ToolCall(id: "call_1", toolName: "search", arguments: arguments)
+        let call = Transcript.ToolCall(id: "call_1", toolName: "search", arguments: arguments)
 
         let parsed = try ConduitToolCallConverter.toParsedToolCall(call)
 

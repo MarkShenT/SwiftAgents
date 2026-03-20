@@ -1,4 +1,8 @@
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+#else
 import Conduit
+#endif
 import Foundation
 import Testing
 @testable import Swarm
@@ -63,7 +67,7 @@ struct ConduitProviderSelectionTests {
         #expect(config.routeByLatency == true)
         #expect(config.siteURL == url)
         #expect(config.appName == "Swarm")
-        #expect(config.dataCollection == Conduit.OpenRouterDataCollection.deny)
+        #expect(config.dataCollection == OpenRouterDataCollection.deny)
     }
 
     @Test("Closure-based Ollama configuration")
@@ -90,6 +94,48 @@ struct ConduitProviderSelectionTests {
         #expect(provider is ConduitInferenceProvider<OpenAIProvider>)
     }
 
+    @Test("OpenRouter provider selection preserves routing metadata")
+    func openRouterSelectionPreservesRoutingMetadata() throws {
+        let url = try #require(URL(string: "https://swarm.dev"))
+        let provider = ConduitProviderSelection
+            .openRouter(apiKey: "test-key", model: "anthropic/claude-3-opus") { routing in
+                routing.providers = [.anthropic]
+                routing.siteURL = url
+                routing.appName = "Swarm"
+                routing.dataCollection = .deny
+            }
+            .makeProvider()
+
+        let metadata = try #require(mirroredOpenRouterMetadata(from: provider))
+        #expect(metadata.siteURL == url)
+        #expect(metadata.appName == "Swarm")
+        #expect(metadata.dataCollectionDescription?.contains("deny") == true)
+    }
+
+    @Test("Ollama provider selection preserves advanced settings")
+    func ollamaSelectionPreservesAdvancedSettings() throws {
+        let provider = ConduitProviderSelection
+            .ollama(model: "llama3.2") { settings in
+                settings.host = "127.0.0.1"
+                settings.port = 11435
+                settings.keepAlive = "10m"
+                settings.pullOnMissing = true
+                settings.numGPU = 2
+                settings.lowVRAM = true
+                settings.numCtx = 4096
+                settings.healthCheck = false
+            }
+            .makeProvider()
+
+        let configuration = try #require(mirroredOllamaConfiguration(from: provider))
+        #expect(configuration.keepAlive == "10m")
+        #expect(configuration.pullOnMissing == true)
+        #expect(configuration.numGPU == 2)
+        #expect(configuration.lowVRAM == true)
+        #expect(configuration.numCtx == 4096)
+        #expect(configuration.healthCheck == false)
+    }
+
     @Test("Maps Ollama settings to Conduit config")
     func mapsOllamaSettings() {
         let settings = OllamaSettings(
@@ -111,4 +157,52 @@ struct ConduitProviderSelectionTests {
         #expect(config.numCtx == 4096)
         #expect(config.healthCheck == false)
     }
+}
+
+private func mirroredOpenRouterMetadata(from provider: Any) -> (siteURL: URL?, appName: String?, dataCollectionDescription: String?)? {
+    guard let rawProvider = unwrapMirrorOptional(Mirror(reflecting: provider).descendant("provider")),
+          let configuration = unwrapMirrorOptional(Mirror(reflecting: rawProvider).descendant("configuration")),
+          let openRouterConfig = unwrapMirrorOptional(Mirror(reflecting: configuration).descendant("openRouterConfig"))
+    else {
+        return nil
+    }
+
+    let mirror = Mirror(reflecting: openRouterConfig)
+    let siteURL = unwrapMirrorOptional(mirror.descendant("siteURL")) as? URL
+    let appName = unwrapMirrorOptional(mirror.descendant("appName")) as? String
+    let dataCollection = unwrapMirrorOptional(mirror.descendant("dataCollection"))
+    return (siteURL, appName, dataCollection.map { String(describing: $0) })
+}
+
+private func mirroredOllamaConfiguration(from provider: Any) -> (
+    keepAlive: String?,
+    pullOnMissing: Bool?,
+    numGPU: Int?,
+    lowVRAM: Bool?,
+    numCtx: Int?,
+    healthCheck: Bool?
+)? {
+    guard let rawProvider = unwrapMirrorOptional(Mirror(reflecting: provider).descendant("provider")),
+          let configuration = unwrapMirrorOptional(Mirror(reflecting: rawProvider).descendant("configuration")),
+          let ollamaConfig = unwrapMirrorOptional(Mirror(reflecting: configuration).descendant("ollamaConfig"))
+    else {
+        return nil
+    }
+
+    let mirror = Mirror(reflecting: ollamaConfig)
+    return (
+        unwrapMirrorOptional(mirror.descendant("keepAlive")) as? String,
+        unwrapMirrorOptional(mirror.descendant("pullOnMissing")) as? Bool,
+        unwrapMirrorOptional(mirror.descendant("numGPU")) as? Int,
+        unwrapMirrorOptional(mirror.descendant("lowVRAM")) as? Bool,
+        unwrapMirrorOptional(mirror.descendant("numCtx")) as? Int,
+        unwrapMirrorOptional(mirror.descendant("healthCheck")) as? Bool
+    )
+}
+
+private func unwrapMirrorOptional(_ value: Any?) -> Any? {
+    guard let value else { return nil }
+    let mirror = Mirror(reflecting: value)
+    guard mirror.displayStyle == .optional else { return value }
+    return mirror.children.first?.value
 }

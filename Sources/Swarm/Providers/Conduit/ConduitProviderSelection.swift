@@ -3,7 +3,11 @@
 //
 // Minimal Conduit-backed provider selection for Swarm.
 
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+#else
 import Conduit
+#endif
 import Foundation
 
 /// Convenience selection for Conduit-backed inference providers.
@@ -12,19 +16,26 @@ import Foundation
 public enum ConduitProviderSelection: Sendable, InferenceProvider {
     case provider(any InferenceProvider)
 
+    private static func anthropicModelID(_ model: String) -> AnthropicProvider.ModelID {
+        AnthropicProvider.ModelID(model)
+    }
+
+    private static func openAIModelID(_ model: String) -> OpenAIProvider.ModelID {
+        OpenAIProvider.ModelID(model)
+    }
+
     /// Creates a Conduit-backed Anthropic provider.
     public static func anthropic(apiKey: String, model: String) -> ConduitProviderSelection {
         let provider = AnthropicProvider(apiKey: apiKey)
-        let modelID = AnthropicModelID(model)
+        let modelID = anthropicModelID(model)
         let bridge = ConduitInferenceProvider(provider: provider, model: modelID)
         return .provider(bridge)
     }
 
     /// Creates a Conduit-backed OpenAI provider.
     public static func openAI(apiKey: String, model: String) -> ConduitProviderSelection {
-        let configuration = OpenAIConfiguration.openAI(apiKey: apiKey)
-        let provider = OpenAIProvider(configuration: configuration)
-        let modelID = OpenAIModelID(model)
+        let provider = OpenAIProvider(apiKey: apiKey)
+        let modelID = openAIModelID(model)
         let bridge = ConduitInferenceProvider(provider: provider, model: modelID)
         return .provider(bridge)
     }
@@ -140,7 +151,7 @@ public enum ConduitProviderSelection: Sendable, InferenceProvider {
     ) -> ConduitProviderSelection {
         #if CONDUIT_TRAIT_MINIMAX
             let provider = MiniMaxProvider(apiKey: apiKey)
-            let modelID = ModelIdentifier.miniMax(model)
+            let modelID: MiniMaxProvider.ModelID = .init(model)
             let bridge = ConduitInferenceProvider(provider: provider, model: modelID)
             return .provider(bridge)
         #else
@@ -180,12 +191,17 @@ public enum ConduitProviderSelection: Sendable, InferenceProvider {
         model: String,
         routing: OpenRouterRouting?
     ) -> ConduitProviderSelection {
-        var configuration = OpenAIConfiguration.openRouter(apiKey: apiKey)
+        let provider: OpenAIProvider
         if let routing {
-            configuration = configuration.routing(routing.toConduit())
+            provider = OpenAIProvider(configuration: OpenAIConfiguration(
+                endpoint: .openRouter,
+                authentication: .bearer(apiKey),
+                openRouterConfig: routing.toConduit()
+            ))
+        } else {
+            provider = OpenAIProvider(openRouterKey: apiKey)
         }
-        let provider = OpenAIProvider(configuration: configuration)
-        let modelID = OpenAIModelID.openRouter(model)
+        let modelID = openAIModelID(model)
         let bridge = ConduitInferenceProvider(provider: provider, model: modelID)
         return .provider(bridge)
     }
@@ -194,10 +210,11 @@ public enum ConduitProviderSelection: Sendable, InferenceProvider {
         model: String,
         settings: OllamaSettings
     ) -> ConduitProviderSelection {
-        let configuration = OpenAIConfiguration.ollama(host: settings.host, port: settings.port)
-            .ollama(settings.toConduit())
-        let provider = OpenAIProvider(configuration: configuration)
-        let modelID = OpenAIModelID.ollama(model)
+        let provider = OpenAIProvider(
+            configuration: .ollama(host: settings.host, port: settings.port)
+                .ollama(settings.toConduit())
+        )
+        let modelID = openAIModelID(model)
         let bridge = ConduitInferenceProvider(provider: provider, model: modelID)
         return .provider(bridge)
     }

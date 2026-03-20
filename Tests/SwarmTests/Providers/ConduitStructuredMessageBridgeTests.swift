@@ -1,4 +1,8 @@
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+#else
 import Conduit
+#endif
 import Testing
 @testable import Swarm
 
@@ -6,34 +10,34 @@ import Testing
 struct ConduitStructuredMessageBridgeTests {
     @Test("Bridges assistant tool calls and tool outputs into Conduit messages")
     func bridgesStructuredMessages() async throws {
-        struct MockModelID: Conduit.ModelIdentifying {
+        struct MockModelID: ModelIdentifying {
             let rawValue: String
             var displayName: String { rawValue }
-            var provider: Conduit.ProviderType { .openAI }
+            var provider: ProviderType { .openAI }
             var description: String { rawValue }
             init(_ rawValue: String) { self.rawValue = rawValue }
         }
 
         final class MessageBox: @unchecked Sendable {
-            var lastMessages: [Conduit.Message]?
+            var lastMessages: [Message]?
         }
 
-        struct CapturingTextGenerator: Conduit.TextGenerator {
+        struct CapturingTextGenerator: TextGenerator {
             typealias ModelID = MockModelID
 
             let box: MessageBox
 
-            func generate(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) async throws -> String {
+            func generate(_ prompt: String, model _: ModelID, config _: GenerateConfig) async throws -> String {
                 prompt
             }
 
             func generate(
-                messages: [Conduit.Message],
+                messages: [Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) async throws -> Conduit.GenerationResult {
+                config _: GenerateConfig
+            ) async throws -> GenerationResult {
                 box.lastMessages = messages
-                return Conduit.GenerationResult(
+                return GenerationResult(
                     text: "ok",
                     tokenCount: 0,
                     generationTime: 0,
@@ -42,17 +46,17 @@ struct ConduitStructuredMessageBridgeTests {
                 )
             }
 
-            func stream(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) -> AsyncThrowingStream<String, Error> {
+            func stream(_ prompt: String, model _: ModelID, config _: GenerateConfig) -> AsyncThrowingStream<String, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
                 }
             }
 
             func streamWithMetadata(
-                messages _: [Conduit.Message],
+                messages _: [Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) -> AsyncThrowingStream<Conduit.GenerationChunk, Error> {
+                config _: GenerateConfig
+            ) -> AsyncThrowingStream<GenerationChunk, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
                 }

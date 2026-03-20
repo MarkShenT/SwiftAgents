@@ -97,4 +97,9 @@ public extension AgentRuntime {
     func memory(_ memory: any Memory) -> EnvironmentAgent {
         environment(\.memory, memory)
     }
+
+    /// Applies a web-search configuration via the environment for the duration of execution.
+    func webSearch(_ configuration: WebSearchTool.Configuration) -> EnvironmentAgent {
+        environment(\.webSearch, configuration)
+    }
 }

@@ -1,153 +1,377 @@
 // WebSearchTool.swift
 // Swarm Framework
 //
-// A tool for performing web searches using the Tavily API.
+// A multi-resolution web search, fetch, and grounding tool for strict-context agents.
 
 import Foundation
 
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
+public struct WebSearchTool: AnyJSONTool, Sendable {
+    public enum Mode: String, Codable, Sendable, Equatable, CaseIterable {
+        case search
+        case fetch
+        case ground
+        case recall
+        case expand
+        case refresh
+    }
 
-/// A tool that performs web searches using the Tavily Search API.
-///
-/// Requires a valid Tavily API key from https://tavily.com
-///
-/// Example:
-/// ```swift
-/// let searchTool = WebSearchTool(apiKey: "tvly-...")
-/// let result = try await searchTool.execute(arguments: ["query": "latest Swift news"])
-/// ```
-@Tool("Performs a web search to find information on a topic.")
-public struct WebSearchTool {
-    // MARK: - Parameters
-    
-    @Parameter("The search query or topic to find information about")
-    var query: String
-    
-    @Parameter("Maximum number of results to return", default: 5)
-    var maxResults: Int = 5
-    
-    @Parameter("Whether to include the raw content of the pages", default: false)
-    var includeRawContent: Bool = false
-    
-    // MARK: - Properties
-    
-    private let apiKey: String
-    private let decoder = JSONDecoder()
-    
-    // MARK: - API Response Types
-    
-    private struct TavilyResponse: Decodable {
-        let results: [TavilyResult]
+    public enum Detail: String, Codable, Sendable, Equatable, CaseIterable {
+        case compact
+        case standard
+        case deep
+        case raw
+
+        var includesDocument: Bool {
+            switch self {
+            case .compact, .standard:
+                false
+            case .deep, .raw:
+                true
+            }
+        }
     }
-    
-    private struct TavilyResult: Decodable {
-        let title: String
-        let url: String
-        let content: String
-        let score: Double
+
+    public enum SummaryMode: String, Codable, Sendable, Equatable, CaseIterable {
+        case extractiveOnly
+        case contextCoreThenFoundationModels
+        case foundationModelsPreferred
     }
-    
-    // MARK: - Initialization
-    
-    /// Creates a new web search tool.
-    ///
-    /// - Parameter apiKey: Your Tavily API key.
+
+    public struct Configuration: Sendable, Equatable {
+        public static let defaultStoreURL = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first?
+        .appendingPathComponent("Swarm", isDirectory: true)
+        .appendingPathComponent("WebMemoryPlane", isDirectory: true)
+        ?? FileManager.default.temporaryDirectory.appendingPathComponent("SwarmWebMemoryPlane", isDirectory: true)
+
+        public var apiKey: String?
+        public var contextProfile: ContextProfile
+        public var summaryMode: SummaryMode
+        public var fetchTimeout: TimeInterval
+        public var maxBodyBytes: Int
+        public var persistFetchedArtifacts: Bool
+        public var localRecallSimilarityThreshold: Double
+        public var maxGroundedFetches: Int
+        public var maxEvidenceSections: Int
+        public var storeURL: URL
+        public var storageQuotaBytes: Int
+        public var enabled: Bool
+        public var userAgent: String
+        public var maxConcurrentFetches: Int
+        public var hostPolitenessDelay: TimeInterval
+        public var persistEvidenceBundles: Bool
+
+        public init(
+            apiKey: String? = nil,
+            contextProfile: ContextProfile = .strict4k,
+            summaryMode: SummaryMode = .contextCoreThenFoundationModels,
+            fetchTimeout: TimeInterval = 20,
+            maxBodyBytes: Int = 1_500_000,
+            persistFetchedArtifacts: Bool = true,
+            localRecallSimilarityThreshold: Double = 0.82,
+            maxGroundedFetches: Int = 3,
+            maxEvidenceSections: Int = 6,
+            storeURL: URL = Configuration.defaultStoreURL,
+            storageQuotaBytes: Int = 64 * 1024 * 1024,
+            enabled: Bool = true,
+            userAgent: String = "SwarmWebMemoryPlane/1.0",
+            maxConcurrentFetches: Int = 2,
+            hostPolitenessDelay: TimeInterval = 0.2,
+            persistEvidenceBundles: Bool = true
+        ) {
+            self.apiKey = apiKey
+            self.contextProfile = contextProfile
+            self.summaryMode = summaryMode
+            self.fetchTimeout = fetchTimeout
+            self.maxBodyBytes = max(64_000, maxBodyBytes)
+            self.persistFetchedArtifacts = persistFetchedArtifacts
+            self.localRecallSimilarityThreshold = min(max(localRecallSimilarityThreshold, 0), 1)
+            self.maxGroundedFetches = max(1, maxGroundedFetches)
+            self.maxEvidenceSections = max(1, maxEvidenceSections)
+            self.storeURL = storeURL
+            self.storageQuotaBytes = max(1_024_000, storageQuotaBytes)
+            self.enabled = enabled
+            self.userAgent = userAgent
+            self.maxConcurrentFetches = max(1, maxConcurrentFetches)
+            self.hostPolitenessDelay = max(0, hostPolitenessDelay)
+            self.persistEvidenceBundles = persistEvidenceBundles
+        }
+
+        public var hasLiveSearchBackend: Bool {
+            !(apiKey?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        }
+    }
+
+    public let name = "websearch"
+    public let description = """
+    Searches the live web, fetches pages, grounds answers across sources, and reuses cached web evidence \
+    without polluting small-context agent prompts.
+    """
+
+    public let parameters: [ToolParameter] = [
+        ToolParameter(
+            name: "mode",
+            description: "Operation mode: search, fetch, ground, recall, expand, or refresh.",
+            type: .oneOf(Mode.allCases.map(\.rawValue)),
+            isRequired: false,
+            defaultValue: .string(Mode.search.rawValue)
+        ),
+        ToolParameter(
+            name: "query",
+            description: "Query for search, ground, or recall.",
+            type: .string,
+            isRequired: false
+        ),
+        ToolParameter(
+            name: "url",
+            description: "URL for fetch or refresh.",
+            type: .string,
+            isRequired: false
+        ),
+        ToolParameter(
+            name: "goal",
+            description: "Task-specific extraction goal used for section ranking and grounding.",
+            type: .string,
+            isRequired: false
+        ),
+        ToolParameter(
+            name: "maxResults",
+            description: "Maximum number of search hits to return.",
+            type: .int,
+            isRequired: false,
+            defaultValue: .int(5)
+        ),
+        ToolParameter(
+            name: "domains",
+            description: "Optional domain allowlist.",
+            type: .array(elementType: .string),
+            isRequired: false
+        ),
+        ToolParameter(
+            name: "recencyDays",
+            description: "Optional recency filter in days for live search.",
+            type: .int,
+            isRequired: false
+        ),
+        ToolParameter(
+            name: "detail",
+            description: "How much context to inline: compact, standard, deep, or raw.",
+            type: .oneOf(Detail.allCases.map(\.rawValue)),
+            isRequired: false,
+            defaultValue: .string(Detail.compact.rawValue)
+        ),
+        ToolParameter(
+            name: "preferCached",
+            description: "Prefer a close cached artifact before live fetch.",
+            type: .bool,
+            isRequired: false,
+            defaultValue: .bool(true)
+        ),
+        ToolParameter(
+            name: "persist",
+            description: "Persist fetched artifacts and evidence bundles.",
+            type: .bool,
+            isRequired: false,
+            defaultValue: .bool(true)
+        ),
+        ToolParameter(
+            name: "artifact_id",
+            description: "Artifact identifier for expand.",
+            type: .string,
+            isRequired: false
+        ),
+        ToolParameter(
+            name: "section_ids",
+            description: "Section identifiers for expand.",
+            type: .array(elementType: .string),
+            isRequired: false
+        ),
+        ToolParameter(
+            name: "bundle_id",
+            description: "Evidence bundle identifier for expand.",
+            type: .string,
+            isRequired: false
+        ),
+        ToolParameter(
+            name: "includeRawContent",
+            description: "Legacy alias for detail=raw.",
+            type: .bool,
+            isRequired: false
+        ),
+    ]
+
+    public var executionSemantics: ToolExecutionSemantics {
+        ToolExecutionSemantics(
+            sideEffectLevel: .readOnly,
+            retryPolicy: .safe,
+            approvalRequirement: .automatic,
+            resultDurability: .artifactBacked
+        )
+    }
+
+    public var isEnabled: Bool {
+        resolvedConfiguration.enabled
+    }
+
+    // Legacy mutable properties preserved for direct-call compatibility.
+    public var mode: String
+    public var query: String
+    public var maxResults: Int
+    public var includeRawContent: Bool
+    public var url: String
+    public var goal: String
+    public var detail: String
+    public var preferCached: Bool
+    public var persist: Bool
+    public var artifactID: String
+    public var sectionIDs: [String]
+    public var bundleID: String
+    public var domains: [String]
+    public var recencyDays: Int?
+
+    private let configuration: Configuration?
+    private let legacyAPIKey: String?
+
     public init(apiKey: String) {
-        // Initialize @Parameter properties with defaults
-        self.query = ""
-        self.maxResults = 5
-        self.includeRawContent = false
-        
-        self.apiKey = apiKey
+        configuration = nil
+        legacyAPIKey = apiKey
+        mode = Mode.search.rawValue
+        query = ""
+        maxResults = 5
+        includeRawContent = false
+        url = ""
+        goal = ""
+        detail = Detail.compact.rawValue
+        preferCached = true
+        persist = true
+        artifactID = ""
+        sectionIDs = []
+        bundleID = ""
+        domains = []
+        recencyDays = nil
     }
-    
-    // MARK: - Execution
-    
+
+    public init(configuration: Configuration) {
+        self.configuration = configuration
+        legacyAPIKey = configuration.apiKey
+        mode = Mode.search.rawValue
+        query = ""
+        maxResults = 5
+        includeRawContent = false
+        url = ""
+        goal = ""
+        detail = Detail.compact.rawValue
+        preferCached = true
+        persist = configuration.persistFetchedArtifacts
+        artifactID = ""
+        sectionIDs = []
+        bundleID = ""
+        domains = []
+        recencyDays = nil
+    }
+
+    public func execute(arguments: [String: SendableValue]) async throws -> SendableValue {
+        let request = try parseRequest(arguments: arguments)
+        let envelope = try await WebToolRuntime.shared.execute(
+            request: request,
+            configuration: resolvedConfiguration
+        )
+        return .string(formatLegacy(envelope))
+    }
+
     public func execute() async throws -> String {
-        guard !apiKey.isEmpty else {
-            throw AgentError.toolExecutionFailed(
-                toolName: "websearch",
-                underlyingError: "Missing API Key. Initialize WebSearchTool with a valid Tavily API key."
-            )
+        let envelope = try await WebToolRuntime.shared.execute(
+            request: legacyRequest(),
+            configuration: resolvedConfiguration
+        )
+        return formatLegacy(envelope)
+    }
+
+    private var resolvedConfiguration: Configuration {
+        if let configuration {
+            return configuration
+        }
+        return Configuration(apiKey: legacyAPIKey)
+    }
+
+    private func parseRequest(arguments: [String: SendableValue]) throws -> WebToolRequest {
+        let rawMode = arguments["mode"]?.stringValue ?? mode
+        let parsedMode = Mode(rawValue: rawMode.lowercased()) ?? .search
+        let rawDetail: String
+        if arguments["includeRawContent"]?.boolValue == true {
+            rawDetail = Detail.raw.rawValue
+        } else {
+            rawDetail = arguments["detail"]?.stringValue ?? (includeRawContent ? Detail.raw.rawValue : detail)
+        }
+        let parsedDetail = Detail(rawValue: rawDetail.lowercased()) ?? .compact
+
+        return WebToolRequest(
+            mode: parsedMode,
+            query: arguments["query"]?.stringValue ?? nonEmpty(query),
+            url: arguments["url"]?.stringValue ?? nonEmpty(url),
+            goal: arguments["goal"]?.stringValue ?? nonEmpty(goal),
+            maxResults: max(1, arguments["maxResults"]?.intValue ?? maxResults),
+            domains: arguments["domains"]?.arrayValue?.compactMap(\.stringValue) ?? domains,
+            recencyDays: arguments["recencyDays"]?.intValue ?? recencyDays,
+            detail: parsedDetail,
+            preferCached: arguments["preferCached"]?.boolValue ?? preferCached,
+            persist: arguments["persist"]?.boolValue ?? persist,
+            artifactID: arguments["artifact_id"]?.stringValue ?? nonEmpty(artifactID),
+            sectionIDs: arguments["section_ids"]?.arrayValue?.compactMap(\.stringValue) ?? sectionIDs,
+            bundleID: arguments["bundle_id"]?.stringValue ?? nonEmpty(bundleID)
+        )
+    }
+
+    private func legacyRequest() -> WebToolRequest {
+        let parsedMode = Mode(rawValue: mode.lowercased()) ?? .search
+        let parsedDetail = includeRawContent
+            ? Detail.raw
+            : (Detail(rawValue: detail.lowercased()) ?? .compact)
+
+        return WebToolRequest(
+            mode: parsedMode,
+            query: nonEmpty(query),
+            url: nonEmpty(url),
+            goal: nonEmpty(goal),
+            maxResults: max(1, maxResults),
+            domains: domains,
+            recencyDays: recencyDays,
+            detail: parsedDetail,
+            preferCached: preferCached,
+            persist: persist,
+            artifactID: nonEmpty(artifactID),
+            sectionIDs: sectionIDs,
+            bundleID: nonEmpty(bundleID)
+        )
+    }
+
+    private func formatLegacy(_ envelope: WebSearchEnvelope) -> String {
+        var lines: [String] = []
+        lines.append(envelope.summary)
+
+        if !envelope.hits.isEmpty {
+            lines.append("")
+            for (index, hit) in envelope.hits.enumerated() {
+                lines.append("\(index + 1). [\(hit.title)](\(hit.url))")
+                lines.append("   \(hit.snippet)")
+            }
         }
 
-        // Validate query length to prevent abuse
-        guard query.count <= 2000 else {
-            throw AgentError.invalidToolArguments(
-                toolName: "websearch",
-                reason: "Query too long (max 2000 characters)"
-            )
+        if !envelope.sectionChunks.isEmpty {
+            lines.append("")
+            for section in envelope.sectionChunks.prefix(3) {
+                lines.append("## \(section.heading)")
+                lines.append(section.text)
+            }
         }
-        
-        // Prepare URL
-        guard let url = URL(string: "https://api.tavily.com/search") else {
-            throw AgentError.toolExecutionFailed(
-                toolName: "websearch",
-                underlyingError: "Invalid API URL"
-            )
-        }
-        
-        // Prepare Request Body
-        let body: [String: Any?] = [
-            "api_key": apiKey,
-            "query": query,
-            "max_results": maxResults,
-            "include_raw_content": includeRawContent,
-            "search_depth": "ultra-fast"
-        ]
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 30 // 30 second timeout
-        request.httpBody = try JSONSerialization.data(withJSONObject: body.compactMapValues { $0 })
-        
-        // Execute Request
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AgentError.toolExecutionFailed(
-                toolName: "websearch",
-                underlyingError: "Invalid response type"
-            )
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            // Log details internally, expose only status code to caller
-            let errorDetail = String(data: data, encoding: .utf8) ?? "<no body>"
-            Log.agents.error("WebSearchTool API error (HTTP \(httpResponse.statusCode)): \(errorDetail.prefix(500))")
-            throw AgentError.toolExecutionFailed(
-                toolName: "websearch",
-                underlyingError: "API request failed (HTTP \(httpResponse.statusCode))"
-            )
-        }
-        
-        // Parse Response
-        do {
-            let tavilyResponse = try decoder.decode(TavilyResponse.self, from: data)
-            return formatResponse(tavilyResponse)
-        } catch {
-            throw AgentError.toolExecutionFailed(
-                toolName: "websearch",
-                underlyingError: "Failed to parse API response: \(error.localizedDescription)"
-            )
-        }
+
+        return lines.joined(separator: "\n")
     }
-    
-    private func formatResponse(_ response: TavilyResponse) -> String {
-        guard !response.results.isEmpty else {
-            return "No results found for '\(query)'."
-        }
-        
-        var output = "Found \(response.results.count) results for '\(query)':\n\n"
-        
-        for (index, result) in response.results.enumerated() {
-            output += "\(index + 1). [\(result.title)](\(result.url))\n"
-            output += "   \(result.content)\n\n"
-        }
-        
-        return output
-    }
+}
+
+private func nonEmpty(_ value: String) -> String? {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
 }

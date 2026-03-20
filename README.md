@@ -57,6 +57,60 @@ print(result.output) // "Apple (AAPL) is currently trading at $182.50."
 
 That is a working agent with type-safe tool calling. The rest of this README covers workflows, memory, guardrails, and the surrounding runtime pieces.
 
+## On-Device Workspace
+
+Swarm now supports a file-backed on-device workspace with:
+
+- `AGENTS.md` for workspace-wide instructions
+- `.swarm/agents/<id>.md` for per-agent specs
+- standard `.swarm/skills/<name>/SKILL.md` folders for reusable skills
+- `.swarm/memory/` for durable writable notes
+
+Code-first setup:
+
+```swift
+let workspace = try AgentWorkspace.appDefault()
+
+let agent = try Agent.onDevice(
+    "You are a concise local assistant.",
+    workspace: workspace,
+    inferenceProvider: .foundationModels
+)
+```
+
+Markdown-first setup:
+
+```swift
+let workspace = try AgentWorkspace.appDefault()
+
+let agent = try Agent.spec(
+    "support",
+    in: workspace,
+    inferenceProvider: .foundationModels
+)
+```
+
+Workspace layout:
+
+```text
+AgentWorkspace/
+  AGENTS.md
+  .swarm/
+    agents/
+      support.md
+    skills/
+      refund-policy/
+        SKILL.md
+    memory/
+      facts/
+      decisions/
+      tasks/
+      lessons/
+      handoffs/
+```
+
+Use `try await workspace.validate()` in development or CI to catch malformed specs and skills before runtime.
+
 ## Why Swarm
 
 - **Swift concurrency is part of the surface.** Swift 6.2 `StrictConcurrency` is enabled across the package.

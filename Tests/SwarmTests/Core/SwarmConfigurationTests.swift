@@ -1,3 +1,4 @@
+import Foundation
 @testable import Swarm
 import Testing
 
@@ -33,11 +34,14 @@ struct SwarmConfigurationTests {
             let mock = MockInferenceProvider()
             await Swarm.configure(provider: mock)
             await Swarm.configure(cloudProvider: mock)
+            await Swarm.configure(web: testWebConfiguration())
             await Swarm.reset()
             let p = await Swarm.defaultProvider
             let c = await Swarm.cloudProvider
+            let w = await Swarm.webConfiguration
             #expect(p == nil)
             #expect(c == nil)
+            #expect(w == nil)
         }
     }
 
@@ -104,11 +108,138 @@ struct SwarmConfigurationTests {
         }
     }
 
+    @Test("configure stores global web configuration")
+    func configureWebConfiguration() async throws {
+        try await withIsolatedConfiguration {
+            let configuration = testWebConfiguration(enabled: false)
+            await Swarm.configure(web: configuration)
+
+            let resolved = await Swarm.webConfiguration
+            #expect(resolved == configuration)
+        }
+    }
+
+    @Test("Ambient web configuration injects websearch without mutating agent tools")
+    func ambientWebConfigurationInjectsWebsearch() async throws {
+        try await withIsolatedConfiguration {
+            let provider = MockInferenceProvider()
+            await provider.configureToolCallingSequence(
+                toolCalls: [(
+                    name: "websearch",
+                    args: [
+                        "mode": .string("recall"),
+                        "query": .string("current docs"),
+                    ]
+                )],
+                finalAnswer: "done"
+            )
+
+            await Swarm.configure(provider: provider)
+            await Swarm.configure(web: testWebConfiguration())
+
+            let agent = try Agent(instructions: "Use tools when available.")
+            #expect(agent.tools.isEmpty)
+
+            let result = try await agent.run("Find current docs")
+            #expect(result.output == "done")
+            #expect(result.toolResults.count == 1)
+            #expect(result.toolResults.first?.isSuccess == true)
+            let toolSummary = result.toolResults.first?.output.stringValue
+            #expect(toolSummary?.contains("Recalled 0 cached sections") == true)
+
+            let schemas = await capturedToolSchemas(from: provider)
+            #expect(schemas?.contains(where: { $0.name == "websearch" }) == true)
+        }
+    }
+
+    @Test("Ambient web configuration makes toolless agents eligible for cloud tool-calling provider")
+    func ambientWebConfigurationUsesCloudProviderWhenNeeded() async throws {
+        try await withIsolatedConfiguration {
+            let cloud = MockInferenceProvider(responses: ["from cloud web"])
+            await cloud.setToolCallResponses([
+                InferenceResponse(content: "from cloud web", finishReason: .completed),
+            ])
+
+            await Swarm.configure(cloudProvider: cloud)
+            await Swarm.configure(web: testWebConfiguration())
+
+            let agent = try Agent(instructions: "Use web tools.")
+            let result = try await agent.run("Research this")
+
+            #expect(result.output == "from cloud web")
+            #expect((await capturedToolSchemas(from: cloud))?.contains(where: { $0.name == "websearch" }) == true)
+        }
+    }
+
+    @Test("Task-local web configuration overrides global web configuration")
+    func taskLocalWebConfigurationOverridesGlobal() async throws {
+        try await withIsolatedConfiguration {
+            let provider = MockInferenceProvider()
+            await provider.setToolCallResponses([
+                InferenceResponse(content: "done", finishReason: .completed),
+            ])
+
+            await Swarm.configure(provider: provider)
+            await Swarm.configure(web: testWebConfiguration(enabled: false))
+
+            let agent = try Agent(instructions: "Use tools when available.")
+                .webSearch(testWebConfiguration(enabled: true))
+
+            _ = try await agent.run("Find docs")
+            let schemas = await capturedToolSchemas(from: provider)
+            #expect(schemas?.contains(where: { $0.name == "websearch" }) == true)
+        }
+    }
+
+    @Test("Explicit websearch tool takes priority over ambient injection")
+    func explicitWebsearchToolTakesPriority() async throws {
+        try await withIsolatedConfiguration {
+            let provider = MockInferenceProvider()
+            await provider.setToolCallResponses([
+                InferenceResponse(content: "done", finishReason: .completed),
+            ])
+
+            await Swarm.configure(provider: provider)
+            await Swarm.configure(web: testWebConfiguration())
+
+            let explicitTool = MockTool(name: "websearch", description: "Explicit override")
+            let agent = try Agent(tools: [explicitTool], instructions: "Use the explicit tool.")
+
+            _ = try await agent.run("Search")
+
+            let schemas = await capturedToolSchemas(from: provider) ?? []
+            #expect(schemas.filter { $0.name == "websearch" }.count == 1)
+            #expect(schemas.first(where: { $0.name == "websearch" })?.description == "Explicit override")
+        }
+    }
+
     // MARK: Private
 
     private func withIsolatedConfiguration<T: Sendable>(
         _ operation: @Sendable () async throws -> T
     ) async rethrows -> T {
         try await withSwarmConfigurationIsolation(operation)
+    }
+
+    private func testWebConfiguration(enabled: Bool = true) -> WebSearchTool.Configuration {
+        WebSearchTool.Configuration(
+            apiKey: nil,
+            persistFetchedArtifacts: false,
+            storeURL: FileManager.default.temporaryDirectory
+                .appendingPathComponent("swarm-web-tests", isDirectory: true)
+                .appendingPathComponent(UUID().uuidString, isDirectory: true),
+            enabled: enabled,
+            persistEvidenceBundles: false
+        )
+    }
+
+    private func capturedToolSchemas(from provider: MockInferenceProvider) async -> [ToolSchema]? {
+        if let lastCall = await provider.toolCallCalls.last {
+            return lastCall.tools
+        }
+        if let lastCall = await provider.toolCallMessageCalls.last {
+            return lastCall.tools
+        }
+        return nil
     }
 }
