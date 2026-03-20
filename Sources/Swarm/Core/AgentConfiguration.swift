@@ -158,6 +158,21 @@ public struct AgentConfiguration: Sendable, Equatable {
     /// Default configuration with sensible defaults.
     public static let `default` = AgentConfiguration()
 
+    /// Recommended defaults for on-device agents.
+    public static var onDeviceDefault: AgentConfiguration {
+        #if os(macOS)
+        AgentConfiguration(
+            contextProfile: .platformDefault,
+            sessionHistoryLimit: 24
+        )
+        #else
+        AgentConfiguration(
+            contextMode: .strict4k,
+            sessionHistoryLimit: 12
+        )
+        #endif
+    }
+
     // MARK: - Identity
 
     /// The name of the agent for identification and logging.

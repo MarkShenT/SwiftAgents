@@ -1,7 +1,7 @@
 <div align="center">
-  <img alt="Swarm — Swift Agent Framework" src="docs/public/banner.svg" />
+  <img alt="Swarm Swift Agent Framework" src="docs/public/banner.svg" />
 
-  <p><strong>The agent framework Swift has been missing.</strong></p>
+  <p><strong>A Swift framework for building agents and multi-agent workflows.</strong></p>
 
   <p>
     <a href="https://swift.org"><img src="https://img.shields.io/badge/Swift-6.2-orange.svg" alt="Swift 6.2" /></a>
@@ -22,7 +22,7 @@ let result = try await Workflow()
   <img alt="Swarm API Flow" src="docs/public/api-flow.gif" width="600" />
 </div>
 
-Two agents. One pipeline. Compiled to a DAG. Crash-resumable. Zero data races.
+Two agents, one pipeline, compiled to a DAG with crash recovery and Swift concurrency safety.
 
 ## Install
 
@@ -42,7 +42,7 @@ struct PriceTool {
     func execute() async throws -> String { "182.50" }
 }
 
-// Create an agent — unlabeled instructions first, tools in @ToolBuilder trailing closure
+// Create an agent with unlabeled instructions first and tools in the trailing @ToolBuilder closure
 let agent = try Agent("Answer finance questions using real data.",
     configuration: .init(name: "Analyst"),
     inferenceProvider: .anthropic(key: "sk-...")) {
@@ -54,15 +54,69 @@ let result = try await agent.run("What is AAPL trading at?")
 print(result.output) // "Apple (AAPL) is currently trading at $182.50."
 ```
 
-That's a working agent with type-safe tool calling. Keep reading for multi-agent workflows, memory, guardrails, and more.
+That is a working agent with type-safe tool calling. The rest of this README covers workflows, memory, guardrails, and the surrounding runtime pieces.
+
+## On-Device Workspace
+
+Swarm now supports a file-backed on-device workspace with:
+
+- `AGENTS.md` for workspace-wide instructions
+- `.swarm/agents/<id>.md` for per-agent specs
+- standard `.swarm/skills/<name>/SKILL.md` folders for reusable skills
+- `.swarm/memory/` for durable writable notes
+
+Code-first setup:
+
+```swift
+let workspace = try AgentWorkspace.appDefault()
+
+let agent = try Agent.onDevice(
+    "You are a concise local assistant.",
+    workspace: workspace,
+    inferenceProvider: .foundationModels
+)
+```
+
+Markdown-first setup:
+
+```swift
+let workspace = try AgentWorkspace.appDefault()
+
+let agent = try Agent.spec(
+    "support",
+    in: workspace,
+    inferenceProvider: .foundationModels
+)
+```
+
+Workspace layout:
+
+```text
+AgentWorkspace/
+  AGENTS.md
+  .swarm/
+    agents/
+      support.md
+    skills/
+      refund-policy/
+        SKILL.md
+    memory/
+      facts/
+      decisions/
+      tasks/
+      lessons/
+      handoffs/
+```
+
+Use `try await workspace.validate()` in development or CI to catch malformed specs and skills before runtime.
 
 ## Why Swarm
 
-- **Data races are compile errors.** Swift 6.2 `StrictConcurrency` is on every target. Non-`Sendable` types crossing actor boundaries won't build. Period.
-- **Type-safe tools at compile time.** The `@Tool` macro generates JSON schemas from your Swift structs. No runtime introspection, no string-typed arguments, no surprises.
-- **Workflows survive crashes.** [Hive](https://github.com/christopherkarani/Hive) checkpointing lets you resume any workflow from an explicit checkpoint ID.
-- **On-device or cloud — same code.** Foundation Models, Anthropic, OpenAI, Ollama, Gemini, MLX. Swap with one line.
-- **Pure Swift.** Built on `AsyncThrowingStream`, actors, result builders, and macros. Not a Python port.
+- **Swift concurrency is part of the surface.** Swift 6.2 `StrictConcurrency` is enabled across the package.
+- **Tools stay type-safe.** The `@Tool` macro generates JSON schemas from Swift structs.
+- **Workflows can survive crashes.** [Hive](https://github.com/christopherkarani/Hive) checkpointing lets you resume from an explicit checkpoint ID.
+- **Cloud and on-device models use the same abstractions.** Foundation Models, Anthropic, OpenAI, Ollama, Gemini, OpenRouter, and MLX all fit the same shape.
+- **It is written in Swift all the way down.** `AsyncThrowingStream`, actors, result builders, and macros are first-class here.
 
 ## Examples
 
@@ -120,7 +174,7 @@ for try await event in agent.stream("Summarize the changelog.") {
 <details>
 <summary><strong>More examples</strong></summary>
 
-#### Semantic memory — on-device SIMD, no cloud API
+#### Semantic memory
 
 ```swift
 let agent = try Agent("You remember past conversations.",
@@ -138,7 +192,7 @@ let agent = try Agent("You are a helpful assistant.",
     outputGuardrails: [GuardrailSpec.maxOutput(2000)])
 ```
 
-#### Closure tools — no struct needed
+#### Closure tools
 
 ```swift
 let reverse = FunctionTool(
@@ -167,7 +221,7 @@ let resumed = try await workflow.durable.execute("watch", resumeFrom: "monitor-v
 #### Provider switching
 
 ```swift
-// On-device, private — no API key needed
+// On-device, private, no API key needed
 let local = try Agent("Be helpful.", inferenceProvider: .foundationModels)
 
 // Cloud
@@ -177,7 +231,7 @@ let cloud = try Agent("Be helpful.", inferenceProvider: .anthropic(key: k))
 let modified = agent.environment(\.inferenceProvider, .ollama(model: "mistral"))
 ```
 
-#### Conversation — stateful multi-turn
+#### Conversation
 
 ```swift
 let conversation = Conversation(with: agent)
@@ -198,12 +252,12 @@ for message in await conversation.messages {
 |---|---|---|---|
 | **Language** | Swift 6.2 | Python | Python |
 | **Data race safety** | Compile-time | Runtime | Runtime |
-| **On-device LLM** | Foundation Models | — | — |
+| **On-device LLM** | Foundation Models | n/a | n/a |
 | **Execution engine** | Compiled DAG (Hive) | Loop-based | Loop-based |
-| **Crash recovery** | Checkpoints | — | Partial |
+| **Crash recovery** | Checkpoints | n/a | Partial |
 | **Type-safe tools** | `@Tool` macro (compile-time) | Decorators (runtime) | Runtime |
 | **Streaming** | `AsyncThrowingStream` | Callbacks | Callbacks |
-| **iOS / macOS native** | First-class | — | — |
+| **iOS / macOS native** | First-class | n/a | n/a |
 
 ## What's Included
 
@@ -217,7 +271,7 @@ for message in await conversation.messages {
 | **Conversation** | `Conversation` actor for stateful multi-turn dialogue |
 | **Resilience** | 7 backoff strategies, circuit breaker, fallback chains, rate limiting |
 | **Observability** | `AgentObserver`, `Tracer`, `SwiftLogTracer`, per-agent token metrics |
-| **MCP** | Model Context Protocol — client and server |
+| **MCP** | Model Context Protocol client and server support |
 | **Providers** | Foundation Models, Anthropic, OpenAI, Ollama, Gemini, OpenRouter, MLX via [Conduit](https://github.com/christopherkarani/Conduit) |
 | **Macros** | `@Tool`, `@Parameter`, `@Traceable`, `#Prompt` |
 
@@ -269,7 +323,7 @@ Foundation Models require iOS 26 / macOS 26. Cloud providers work on any Swift 6
 ## Contributing
 
 1. Fork → branch → `swift test` → PR
-2. All public types must be `Sendable` — the compiler enforces it
+2. All public types must be `Sendable`; the compiler enforces it
 3. Format with `swift package plugin --allow-writing-to-package-directory swiftformat`
 
 Bug reports and feature requests: [GitHub Issues](https://github.com/christopherkarani/Swarm/issues)

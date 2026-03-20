@@ -163,7 +163,7 @@ public actor DefaultMembraneAgentAdapter: MembraneAgentAdapter {
             }
             loadedToolNames = Array(loadedSet).sorted()
 
-            nextPlan = ToolPlan.normalizedJIT(index: index, loadedToolNames: loadedToolNames)
+            nextPlan = ToolPlan.jit(normalized: index, loaded: loadedToolNames)
             let loadedNames = Set(loadedToolNames)
             selectedSchemas = sortedSchemas.filter { loadedNames.contains($0.name) }
             selectedSchemas.append(contentsOf: MembraneInternalTools.schemaSet())

@@ -1,41 +1,45 @@
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+#else
 import Conduit
+#endif
 import Testing
 @testable import Swarm
 
 @Suite("Conduit Inference Provider Option Mapping")
 struct ConduitInferenceProviderOptionsMappingTests {
     private final class ConfigBox: @unchecked Sendable {
-        var lastPromptConfig: Conduit.GenerateConfig?
-        var lastMessagesConfig: Conduit.GenerateConfig?
-        var lastStreamWithMetadataConfig: Conduit.GenerateConfig?
+        var lastPromptConfig: ConduitAdvanced.GenerateConfig?
+        var lastMessagesConfig: ConduitAdvanced.GenerateConfig?
+        var lastStreamWithMetadataConfig: ConduitAdvanced.GenerateConfig?
     }
 
     @Test("Applies InferenceOptions.topK to Conduit GenerateConfig")
     func appliesTopK() async throws {
-        struct MockModelID: Conduit.ModelIdentifying {
+        struct MockModelID: ConduitAdvanced.ModelIdentifying {
             let rawValue: String
             var displayName: String { rawValue }
-            var provider: Conduit.ProviderType { .openAI }
+            var provider: ConduitAdvanced.ProviderType { .openAI }
             var description: String { rawValue }
             init(_ rawValue: String) { self.rawValue = rawValue }
         }
 
-        struct CapturingTextGenerator: Conduit.TextGenerator {
+        struct CapturingTextGenerator: ConduitAdvanced.TextGenerator {
             typealias ModelID = MockModelID
 
             let box: ConfigBox
 
-            func generate(_ prompt: String, model _: ModelID, config: Conduit.GenerateConfig) async throws -> String {
+            func generate(_ prompt: String, model _: ModelID, config: ConduitAdvanced.GenerateConfig) async throws -> String {
                 box.lastPromptConfig = config
                 return ""
             }
 
             func generate(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) async throws -> Conduit.GenerationResult {
-                Conduit.GenerationResult(
+                config _: ConduitAdvanced.GenerateConfig
+            ) async throws -> ConduitAdvanced.GenerationResult {
+                ConduitAdvanced.GenerationResult(
                     text: "",
                     tokenCount: 0,
                     generationTime: 0,
@@ -44,7 +48,7 @@ struct ConduitInferenceProviderOptionsMappingTests {
                 )
             }
 
-            func stream(_ prompt: String, model _: ModelID, config: Conduit.GenerateConfig) -> AsyncThrowingStream<String, Error> {
+            func stream(_ prompt: String, model _: ModelID, config: ConduitAdvanced.GenerateConfig) -> AsyncThrowingStream<String, Error> {
                 box.lastPromptConfig = config
                 return StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
@@ -52,10 +56,10 @@ struct ConduitInferenceProviderOptionsMappingTests {
             }
 
             func streamWithMetadata(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) -> AsyncThrowingStream<Conduit.GenerationChunk, Error> {
+                config _: ConduitAdvanced.GenerateConfig
+            ) -> AsyncThrowingStream<ConduitAdvanced.GenerationChunk, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
                 }
@@ -74,30 +78,30 @@ struct ConduitInferenceProviderOptionsMappingTests {
 
     @Test("Applies seed and parallelToolCalls to Conduit GenerateConfig")
     func appliesSeedAndParallelToolCalls() async throws {
-        struct MockModelID: Conduit.ModelIdentifying {
+        struct MockModelID: ConduitAdvanced.ModelIdentifying {
             let rawValue: String
             var displayName: String { rawValue }
-            var provider: Conduit.ProviderType { .openAI }
+            var provider: ConduitAdvanced.ProviderType { .openAI }
             var description: String { rawValue }
             init(_ rawValue: String) { self.rawValue = rawValue }
         }
 
-        struct CapturingTextGenerator: Conduit.TextGenerator {
+        struct CapturingTextGenerator: ConduitAdvanced.TextGenerator {
             typealias ModelID = MockModelID
 
             let box: ConfigBox
 
-            func generate(_ prompt: String, model _: ModelID, config: Conduit.GenerateConfig) async throws -> String {
+            func generate(_ prompt: String, model _: ModelID, config: ConduitAdvanced.GenerateConfig) async throws -> String {
                 box.lastPromptConfig = config
                 return ""
             }
 
             func generate(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) async throws -> Conduit.GenerationResult {
-                Conduit.GenerationResult(
+                config _: ConduitAdvanced.GenerateConfig
+            ) async throws -> ConduitAdvanced.GenerationResult {
+                ConduitAdvanced.GenerationResult(
                     text: "",
                     tokenCount: 0,
                     generationTime: 0,
@@ -106,7 +110,7 @@ struct ConduitInferenceProviderOptionsMappingTests {
                 )
             }
 
-            func stream(_ prompt: String, model _: ModelID, config: Conduit.GenerateConfig) -> AsyncThrowingStream<String, Error> {
+            func stream(_ prompt: String, model _: ModelID, config: ConduitAdvanced.GenerateConfig) -> AsyncThrowingStream<String, Error> {
                 box.lastPromptConfig = config
                 return StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
@@ -114,10 +118,10 @@ struct ConduitInferenceProviderOptionsMappingTests {
             }
 
             func streamWithMetadata(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) -> AsyncThrowingStream<Conduit.GenerationChunk, Error> {
+                config _: ConduitAdvanced.GenerateConfig
+            ) -> AsyncThrowingStream<ConduitAdvanced.GenerationChunk, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
                 }
@@ -140,30 +144,30 @@ struct ConduitInferenceProviderOptionsMappingTests {
 
     @Test("Does not apply toolChoice when tools are empty (generateWithToolCalls)")
     func doesNotApplyToolChoiceWhenNoTools_generate() async throws {
-        struct MockModelID: Conduit.ModelIdentifying {
+        struct MockModelID: ConduitAdvanced.ModelIdentifying {
             let rawValue: String
             var displayName: String { rawValue }
-            var provider: Conduit.ProviderType { .openAI }
+            var provider: ConduitAdvanced.ProviderType { .openAI }
             var description: String { rawValue }
             init(_ rawValue: String) { self.rawValue = rawValue }
         }
 
-        struct CapturingTextGenerator: Conduit.TextGenerator {
+        struct CapturingTextGenerator: ConduitAdvanced.TextGenerator {
             typealias ModelID = MockModelID
 
             let box: ConfigBox
 
-            func generate(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) async throws -> String {
+            func generate(_ prompt: String, model _: ModelID, config _: ConduitAdvanced.GenerateConfig) async throws -> String {
                 ""
             }
 
             func generate(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config: Conduit.GenerateConfig
-            ) async throws -> Conduit.GenerationResult {
+                config: ConduitAdvanced.GenerateConfig
+            ) async throws -> ConduitAdvanced.GenerationResult {
                 box.lastMessagesConfig = config
-                return Conduit.GenerationResult(
+                return ConduitAdvanced.GenerationResult(
                     text: "",
                     tokenCount: 0,
                     generationTime: 0,
@@ -172,17 +176,17 @@ struct ConduitInferenceProviderOptionsMappingTests {
                 )
             }
 
-            func stream(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) -> AsyncThrowingStream<String, Error> {
+            func stream(_ prompt: String, model _: ModelID, config _: ConduitAdvanced.GenerateConfig) -> AsyncThrowingStream<String, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
                 }
             }
 
             func streamWithMetadata(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) -> AsyncThrowingStream<Conduit.GenerationChunk, Error> {
+                config _: ConduitAdvanced.GenerateConfig
+            ) -> AsyncThrowingStream<ConduitAdvanced.GenerationChunk, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
                 }
@@ -205,29 +209,29 @@ struct ConduitInferenceProviderOptionsMappingTests {
 
     @Test("Does not apply toolChoice when tools are empty (streamWithToolCalls)")
     func doesNotApplyToolChoiceWhenNoTools_stream() async throws {
-        struct MockModelID: Conduit.ModelIdentifying {
+        struct MockModelID: ConduitAdvanced.ModelIdentifying {
             let rawValue: String
             var displayName: String { rawValue }
-            var provider: Conduit.ProviderType { .openAI }
+            var provider: ConduitAdvanced.ProviderType { .openAI }
             var description: String { rawValue }
             init(_ rawValue: String) { self.rawValue = rawValue }
         }
 
-        struct CapturingTextGenerator: Conduit.TextGenerator {
+        struct CapturingTextGenerator: ConduitAdvanced.TextGenerator {
             typealias ModelID = MockModelID
 
             let box: ConfigBox
 
-            func generate(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) async throws -> String {
+            func generate(_ prompt: String, model _: ModelID, config _: ConduitAdvanced.GenerateConfig) async throws -> String {
                 ""
             }
 
             func generate(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) async throws -> Conduit.GenerationResult {
-                Conduit.GenerationResult(
+                config _: ConduitAdvanced.GenerateConfig
+            ) async throws -> ConduitAdvanced.GenerationResult {
+                ConduitAdvanced.GenerationResult(
                     text: "",
                     tokenCount: 0,
                     generationTime: 0,
@@ -236,17 +240,17 @@ struct ConduitInferenceProviderOptionsMappingTests {
                 )
             }
 
-            func stream(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) -> AsyncThrowingStream<String, Error> {
+            func stream(_ prompt: String, model _: ModelID, config _: ConduitAdvanced.GenerateConfig) -> AsyncThrowingStream<String, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
                 }
             }
 
             func streamWithMetadata(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config: Conduit.GenerateConfig
-            ) -> AsyncThrowingStream<Conduit.GenerationChunk, Error> {
+                config: ConduitAdvanced.GenerateConfig
+            ) -> AsyncThrowingStream<ConduitAdvanced.GenerationChunk, Error> {
                 box.lastStreamWithMetadataConfig = config
                 return StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
@@ -272,27 +276,27 @@ struct ConduitInferenceProviderOptionsMappingTests {
 
     @Test("Rejects unsupported conduit runtime policy provider settings")
     func rejectsUnsupportedRuntimePolicyProviderSettings() async throws {
-        struct MockModelID: Conduit.ModelIdentifying {
+        struct MockModelID: ConduitAdvanced.ModelIdentifying {
             let rawValue: String
             var displayName: String { rawValue }
-            var provider: Conduit.ProviderType { .openAI }
+            var provider: ConduitAdvanced.ProviderType { .openAI }
             var description: String { rawValue }
             init(_ rawValue: String) { self.rawValue = rawValue }
         }
 
-        struct CapturingTextGenerator: Conduit.TextGenerator {
+        struct CapturingTextGenerator: ConduitAdvanced.TextGenerator {
             typealias ModelID = MockModelID
 
-            func generate(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) async throws -> String {
+            func generate(_ prompt: String, model _: ModelID, config _: ConduitAdvanced.GenerateConfig) async throws -> String {
                 prompt
             }
 
             func generate(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) async throws -> Conduit.GenerationResult {
-                Conduit.GenerationResult(
+                config _: ConduitAdvanced.GenerateConfig
+            ) async throws -> ConduitAdvanced.GenerationResult {
+                ConduitAdvanced.GenerationResult(
                     text: "",
                     tokenCount: 0,
                     generationTime: 0,
@@ -301,7 +305,7 @@ struct ConduitInferenceProviderOptionsMappingTests {
                 )
             }
 
-            func stream(_ prompt: String, model _: ModelID, config _: Conduit.GenerateConfig) -> AsyncThrowingStream<String, Error> {
+            func stream(_ prompt: String, model _: ModelID, config _: ConduitAdvanced.GenerateConfig) -> AsyncThrowingStream<String, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.yield(prompt)
                     continuation.finish()
@@ -309,10 +313,10 @@ struct ConduitInferenceProviderOptionsMappingTests {
             }
 
             func streamWithMetadata(
-                messages _: [Conduit.Message],
+                messages _: [ConduitAdvanced.Message],
                 model _: ModelID,
-                config _: Conduit.GenerateConfig
-            ) -> AsyncThrowingStream<Conduit.GenerationChunk, Error> {
+                config _: ConduitAdvanced.GenerateConfig
+            ) -> AsyncThrowingStream<ConduitAdvanced.GenerationChunk, Error> {
                 StreamHelper.makeTrackedStream { continuation in
                     continuation.finish()
                 }

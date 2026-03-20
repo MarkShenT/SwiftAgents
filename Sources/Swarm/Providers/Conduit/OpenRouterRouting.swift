@@ -3,7 +3,15 @@
 //
 // Lightweight OpenRouter routing configuration without exposing Conduit types.
 
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+typealias ConduitOpenRouterProvider = ConduitAdvanced.OpenRouterProvider
+typealias ConduitOpenRouterDataCollection = ConduitAdvanced.OpenRouterDataCollection
+#else
 import Conduit
+typealias ConduitOpenRouterProvider = Conduit.OpenRouterProvider
+typealias ConduitOpenRouterDataCollection = Conduit.OpenRouterDataCollection
+#endif
 import Foundation
 
 /// OpenRouter routing preferences.
@@ -39,14 +47,14 @@ public struct OpenRouterRouting: Sendable, Hashable {
     }
 
     func toConduit() -> OpenRouterRoutingConfig {
-        let mappedProviders = providers?.map { $0.toConduit() }
+        let mappedProviders = providers?.map(\.toConduit)
         return OpenRouterRoutingConfig(
             providers: mappedProviders,
             fallbacks: fallbacks,
             routeByLatency: routeByLatency,
             siteURL: siteURL,
             appName: appName,
-            dataCollection: dataCollection?.toConduit()
+            dataCollection: dataCollection.flatMap { ConduitOpenRouterDataCollection(rawValue: $0.rawValue) }
         )
     }
 }
@@ -77,50 +85,37 @@ public enum OpenRouterDataCollectionPolicy: String, Sendable, Hashable, CaseIter
     case deny
 }
 
-// MARK: - Conduit Mapping
-
-extension OpenRouterProvider {
-    func toConduit() -> Conduit.OpenRouterProvider {
+private extension OpenRouterProvider {
+    var toConduit: ConduitOpenRouterProvider {
         switch self {
         case .openai:
-            return .openai
+            .openai
         case .anthropic:
-            return .anthropic
+            .anthropic
         case .google:
-            return .google
+            .google
         case .googleAIStudio:
-            return .googleAIStudio
+            .googleAIStudio
         case .together:
-            return .together
+            .together
         case .fireworks:
-            return .fireworks
+            .fireworks
         case .perplexity:
-            return .perplexity
+            .perplexity
         case .mistral:
-            return .mistral
+            .mistral
         case .groq:
-            return .groq
+            .groq
         case .deepseek:
-            return .deepseek
+            .deepseek
         case .cohere:
-            return .cohere
+            .cohere
         case .ai21:
-            return .ai21
+            .ai21
         case .bedrock:
-            return .bedrock
+            .bedrock
         case .azure:
-            return .azure
-        }
-    }
-}
-
-extension OpenRouterDataCollectionPolicy {
-    func toConduit() -> Conduit.OpenRouterDataCollection {
-        switch self {
-        case .allow:
-            return .allow
-        case .deny:
-            return .deny
+            .azure
         }
     }
 }

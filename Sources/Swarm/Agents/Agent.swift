@@ -671,6 +671,7 @@ public struct Agent: AgentRuntime, Sendable {
             tracer: activeTracer,
             agentName: configuration.name.isEmpty ? "Agent" : configuration.name
         )
+        let runtimeToolRegistry = try await resolvedToolRegistry()
         await tracing.traceStart(input: input)
 
         // Notify observer of agent start
@@ -706,8 +707,10 @@ public struct Agent: AgentRuntime, Sendable {
             let replayTranscript = SwarmTranscript(memoryMessages: sessionHistory)
             try replayTranscript.validateReplayCompatibility()
 
-            // Seed memory with session history once (only if memory is empty).
-            if let activeMemory, !sessionHistory.isEmpty, await activeMemory.isEmpty {
+            // Seed memory with session history once (only if memory is empty and the memory allows it).
+            let importPolicy = activeMemory as? any MemorySessionImportPolicy
+            let allowsSessionSeeding = importPolicy?.allowsAutomaticSessionSeeding ?? true
+            if let activeMemory, allowsSessionSeeding, !sessionHistory.isEmpty, await activeMemory.isEmpty {
                 for message in sessionHistory {
                     await activeMemory.add(message)
                 }
@@ -719,6 +722,7 @@ public struct Agent: AgentRuntime, Sendable {
             // Execute the tool calling loop with session context
             let toolLoopOutcome = try await executeToolCallingLoop(
                 input: input,
+                toolRegistry: runtimeToolRegistry,
                 sessionHistory: sessionHistory,
                 session: session,
                 resultBuilder: resultBuilder,
@@ -787,7 +791,7 @@ public struct Agent: AgentRuntime, Sendable {
 
     // MARK: - Inference Provider Resolution
 
-    private func resolvedInferenceProvider() async throws -> any InferenceProvider {
+    private func resolvedInferenceProvider(toolRegistry: ToolRegistry) async throws -> any InferenceProvider {
         // 1. Explicit provider on Agent
         if let inferenceProvider {
             return inferenceProvider
@@ -834,6 +838,25 @@ public struct Agent: AgentRuntime, Sendable {
             return adapter
         }
         return DefaultMembraneAgentAdapter(configuration: membrane.configuration)
+    }
+
+    private func resolvedToolRegistry() async throws -> ToolRegistry {
+        let baseTools = await toolRegistry.allTools
+        guard !baseTools.contains(where: { $0.name == "websearch" }) else {
+            return try ToolRegistry(tools: baseTools)
+        }
+
+        let taskLocalWeb = AgentEnvironmentValues.current.webSearch
+        let ambientWeb = if let taskLocalWeb { taskLocalWeb } else { await Swarm.webConfiguration }
+        guard let ambientWeb,
+              ambientWeb.enabled
+        else {
+            return try ToolRegistry(tools: baseTools)
+        }
+
+        var tools = baseTools
+        tools.append(WebSearchTool(configuration: ambientWeb))
+        return try ToolRegistry(tools: tools)
     }
 
     private func resolvedInferenceOptions(
@@ -949,6 +972,7 @@ public struct Agent: AgentRuntime, Sendable {
 
     private func executeToolCallingLoop(
         input: String,
+        toolRegistry: ToolRegistry,
         sessionHistory: [MemoryMessage] = [],
         session: (any Session)?,
         resultBuilder: AgentResult.Builder,
@@ -958,7 +982,7 @@ public struct Agent: AgentRuntime, Sendable {
     ) async throws -> ToolLoopOutcome {
         var iteration = 0
         let startTime = ContinuousClock.now
-        let provider = try await resolvedInferenceProvider()
+        let provider = try await resolvedInferenceProvider(toolRegistry: toolRegistry)
         var inferenceOptions = await resolvedInferenceOptions(session: session, provider: provider)
         if let structuredOutputRequest {
             inferenceOptions.structuredOutput = structuredOutputRequest
@@ -968,8 +992,20 @@ public struct Agent: AgentRuntime, Sendable {
         let activeMemory = memory ?? AgentEnvironmentValues.current.memory
         var memoryContext = ""
         if let mem = activeMemory {
-            let tokenLimit = configuration.effectiveContextProfile.memoryTokenLimit
-            memoryContext = await mem.context(for: input, tokenLimit: tokenLimit)
+            let contextProfile = configuration.effectiveContextProfile
+            let tokenLimit = contextProfile.memoryTokenLimit
+            if let policyAwareMemory = mem as? any MemoryRetrievalPolicyAware {
+                memoryContext = await policyAwareMemory.context(
+                    for: MemoryQuery(
+                        text: input,
+                        tokenLimit: tokenLimit,
+                        maxItems: contextProfile.maxRetrievedItems,
+                        maxItemTokens: contextProfile.maxRetrievedItemTokens
+                    )
+                )
+            } else {
+                memoryContext = await mem.context(for: input, tokenLimit: tokenLimit)
+            }
         }
 
         var conversationHistory = try buildInitialConversationHistory(
@@ -996,7 +1032,7 @@ public struct Agent: AgentRuntime, Sendable {
                 try checkCancellationAndTimeout(startTime: startTime)
 
                 let rawPrompt = buildPrompt(from: conversationHistory)
-                let unplannedSchemas = await buildToolSchemasWithHandoffs()
+                let unplannedSchemas = await buildToolSchemasWithHandoffs(toolRegistry: toolRegistry)
                 var plannedPrompt = rawPrompt
                 var plannedSchemas = MembraneInternalTools.sortedSchemas(unplannedSchemas)
 
@@ -1089,6 +1125,7 @@ public struct Agent: AgentRuntime, Sendable {
                 if response.hasToolCalls {
                     let handoffResult = try await processToolCallsWithHandoffs(
                         response: response,
+                        toolRegistry: toolRegistry,
                         conversationHistory: &conversationHistory,
                         transcriptMessages: &transcriptMessages,
                         resultBuilder: resultBuilder,
@@ -1313,6 +1350,7 @@ public struct Agent: AgentRuntime, Sendable {
     /// Processes tool calls from the model response.
     private func processToolCalls(
         response: InferenceResponse,
+        toolRegistry: ToolRegistry,
         conversationHistory: inout [ConversationMessage],
         transcriptMessages: inout [MemoryMessage],
         resultBuilder: AgentResult.Builder,
@@ -1334,6 +1372,7 @@ public struct Agent: AgentRuntime, Sendable {
         for parsedCall in response.toolCalls {
             try await executeSingleToolCall(
                 parsedCall: parsedCall,
+                toolRegistry: toolRegistry,
                 conversationHistory: &conversationHistory,
                 transcriptMessages: &transcriptMessages,
                 resultBuilder: resultBuilder,
@@ -1348,6 +1387,7 @@ public struct Agent: AgentRuntime, Sendable {
     /// Executes a single tool call and updates conversation history.
     private func executeSingleToolCall(
         parsedCall: InferenceResponse.ParsedToolCall,
+        toolRegistry: ToolRegistry,
         conversationHistory: inout [ConversationMessage],
         transcriptMessages: inout [MemoryMessage],
         resultBuilder: AgentResult.Builder,
@@ -1523,7 +1563,7 @@ public struct Agent: AgentRuntime, Sendable {
     ///
     /// This merges regular tool schemas with handoff-generated schemas,
     /// allowing handoffs to appear as callable tools in the LLM prompt.
-    private func buildToolSchemasWithHandoffs() async -> [ToolSchema] {
+    private func buildToolSchemasWithHandoffs(toolRegistry: ToolRegistry) async -> [ToolSchema] {
         var schemas = await toolRegistry.schemas
 
         for handoff in _handoffs {
@@ -1552,6 +1592,7 @@ public struct Agent: AgentRuntime, Sendable {
     /// Returns the handoff output if a handoff was executed, nil otherwise.
     private func processToolCallsWithHandoffs(
         response: InferenceResponse,
+        toolRegistry: ToolRegistry,
         conversationHistory: inout [ConversationMessage],
         transcriptMessages: inout [MemoryMessage],
         resultBuilder: AgentResult.Builder,
@@ -1639,6 +1680,7 @@ public struct Agent: AgentRuntime, Sendable {
             // Regular tool call
             try await executeSingleToolCall(
                 parsedCall: parsedCall,
+                toolRegistry: toolRegistry,
                 conversationHistory: &conversationHistory,
                 transcriptMessages: &transcriptMessages,
                 resultBuilder: resultBuilder,

@@ -51,6 +51,7 @@ export default defineConfig({
           text: 'Introduction',
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
+            { text: 'Agent Workspace', link: '/guide/agent-workspace' },
             { text: 'Why Swarm', link: '/guide/why-swarm' },
           ]
         },

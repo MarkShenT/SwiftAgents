@@ -1,4 +1,8 @@
+#if canImport(ConduitAdvanced)
+import ConduitAdvanced
+#else
 import Conduit
+#endif
 import Foundation
 
 /// Opinionated, beginner-friendly inference presets backed by Conduit.
@@ -13,6 +17,14 @@ public struct LLM: Sendable, InferenceProvider {
     // MARK: - Private Storage
 
     private let kind: Kind
+
+    private static func anthropicModelID(_ model: String) -> AnthropicProvider.ModelID {
+        AnthropicProvider.ModelID(model)
+    }
+
+    private static func openAIModelID(_ model: String) -> OpenAIProvider.ModelID {
+        OpenAIProvider.ModelID(model)
+    }
 
     private enum Kind: Sendable {
         case openAI(OpenAIConfig)
@@ -165,8 +177,8 @@ public struct LLM: Sendable, InferenceProvider {
     private func makeProvider() -> any InferenceProvider {
         switch kind {
         case let .openAI(config):
-            let provider = OpenAIProvider(configuration: .openAI(apiKey: config.apiKey))
-            let modelID = OpenAIModelID(config.model)
+            let provider = OpenAIProvider(apiKey: config.apiKey)
+            let modelID = Self.openAIModelID(config.model)
             return ConduitInferenceProvider(
                 provider: provider,
                 model: modelID,
@@ -174,19 +186,15 @@ public struct LLM: Sendable, InferenceProvider {
             )
         case let .anthropic(config):
             let provider = AnthropicProvider(apiKey: config.apiKey)
-            let modelID = AnthropicModelID(config.model)
+            let modelID = Self.anthropicModelID(config.model)
             return ConduitInferenceProvider(
                 provider: provider,
                 model: modelID,
                 baseConfig: config.advanced.baseConfig
             )
         case let .openRouter(config):
-            var configuration = OpenAIConfiguration.openRouter(apiKey: config.apiKey)
-            if let routing = config.advanced.openRouter.routing {
-                configuration = configuration.routing(routing.toConduit())
-            }
-            let provider = OpenAIProvider(configuration: configuration)
-            let modelID = OpenAIModelID.openRouter(config.model)
+            let provider = openRouterProvider(apiKey: config.apiKey, routing: config.advanced.openRouter.routing)
+            let modelID = Self.openAIModelID(config.model)
             return ConduitInferenceProvider(
                 provider: provider,
                 model: modelID,
@@ -195,7 +203,7 @@ public struct LLM: Sendable, InferenceProvider {
         case let .minimax(config):
             #if CONDUIT_TRAIT_MINIMAX
                 let provider = MiniMaxProvider(apiKey: config.apiKey)
-                let modelID = ModelIdentifier.miniMax(config.model)
+                let modelID: MiniMaxProvider.ModelID = .init(config.model)
                 return ConduitInferenceProvider(
                     provider: provider,
                     model: modelID,
@@ -203,9 +211,8 @@ public struct LLM: Sendable, InferenceProvider {
                 )
             #else
                 let routedModel = config.model.hasPrefix("minimax/") ? config.model : "minimax/\(config.model)"
-                let configuration = OpenAIConfiguration.openRouter(apiKey: config.apiKey)
-                let provider = OpenAIProvider(configuration: configuration)
-                let modelID = OpenAIModelID.openRouter(routedModel)
+                let provider = OpenAIProvider(openRouterKey: config.apiKey)
+                let modelID = Self.openAIModelID(routedModel)
                 return ConduitInferenceProvider(
                     provider: provider,
                     model: modelID,
@@ -213,15 +220,28 @@ public struct LLM: Sendable, InferenceProvider {
                 )
             #endif
         case let .ollama(config):
-            let configuration = OpenAIConfiguration.ollama(
-                host: config.settings.host,
-                port: config.settings.port
+            let provider = OpenAIProvider(
+                configuration: .ollama(
+                    host: config.settings.host,
+                    port: config.settings.port
+                ).ollama(config.settings.toConduit())
             )
-            .ollama(config.settings.toConduit())
-            let provider = OpenAIProvider(configuration: configuration)
-            let modelID = OpenAIModelID.ollama(config.model)
+            let modelID = Self.openAIModelID(config.model)
             return ConduitInferenceProvider(provider: provider, model: modelID)
         }
+    }
+
+    private func openRouterProvider(
+        apiKey: String,
+        routing: OpenRouterRouting?
+    ) -> OpenAIProvider {
+        guard let routing else {
+            return OpenAIProvider(openRouterKey: apiKey)
+        }
+
+        return OpenAIProvider(
+            configuration: .openRouter(apiKey: apiKey).routing(routing.toConduit())
+        )
     }
 }
 
@@ -455,7 +475,7 @@ extension LLM {
         static let `default` = AdvancedOptions()
 
         /// Baseline Conduit generation configuration (internal — not part of the public API).
-        var baseConfig: Conduit.GenerateConfig
+        var baseConfig: GenerateConfig
 
         var openRouter: OpenRouterOptions
 
@@ -464,7 +484,7 @@ extension LLM {
             self.openRouter = openRouter
         }
 
-        init(baseConfig: Conduit.GenerateConfig, openRouter: OpenRouterOptions = .default) {
+        init(baseConfig: GenerateConfig, openRouter: OpenRouterOptions = .default) {
             self.baseConfig = baseConfig
             self.openRouter = openRouter
         }
