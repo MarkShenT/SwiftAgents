@@ -875,7 +875,7 @@ public struct Agent: AgentRuntime, Sendable {
             // This avoids duplication: session stores conversation, memory provides context
             // Note: If using memory for conversation context, populate it from session on demand
 
-            _ = resultBuilder.setMetadata(RuntimeMetadata.runtimeEngineKey, .string(RuntimeMetadata.hiveRuntimeEngineName))
+            _ = resultBuilder.setMetadata(RuntimeMetadata.runtimeEngineKey, .string(RuntimeMetadata.graphRuntimeEngineName))
             let result = resultBuilder.build()
             if configuration.autoPreviousResponseId, let session {
                 let response = makeResponse(from: result, responseID: responseID)

@@ -22,9 +22,9 @@ struct V2SurfaceAuditTests {
 
     // MARK: - Version
 
-    @Test("Swarm.version is 2.0.0")
+    @Test("Swarm.version is 0.5.0")
     func versionIsV2() {
-        #expect(Swarm.version == "2.0.0")
+        #expect(Swarm.version == "0.5.0")
     }
 
     // MARK: - TokenUsage (module-level, not nested)
@@ -105,8 +105,8 @@ struct V2SurfaceAuditTests {
     func agentResultRuntimeEnginePublic() {
         let result = AgentResult(
             output: "test",
-            metadata: ["runtime.engine": .string("hive")]
+            metadata: ["runtime.engine": .string("graph")]
         )
-        #expect(result.runtimeEngine == "hive")
+        #expect(result.runtimeEngine == "graph")
     }
 }

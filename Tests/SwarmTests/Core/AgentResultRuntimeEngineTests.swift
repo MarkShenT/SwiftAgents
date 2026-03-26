@@ -19,9 +19,9 @@ struct AgentResultRuntimeEngineTests {
     func returnsEngineFromMetadata() {
         let result = AgentResult(
             output: "hi",
-            metadata: ["runtime.engine": .string("hive")]
+            metadata: ["runtime.engine": .string("graph")]
         )
-        #expect(result.runtimeEngine == "hive")
+        #expect(result.runtimeEngine == "graph")
     }
 
     @Test("returns nil when metadata value is not a string")

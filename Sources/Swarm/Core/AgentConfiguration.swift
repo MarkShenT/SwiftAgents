@@ -15,8 +15,8 @@ public enum ContextMode: Sendable, Equatable {
     case strict4k
 }
 
-/// Optional Hive run options override for orchestration execution.
-struct SwarmHiveRunOptionsOverride: Sendable, Equatable {
+/// Optional graph runtime override for orchestration execution.
+struct SwarmGraphRunOptionsOverride: Sendable, Equatable {
     var maxSteps: Int?
     var maxConcurrentTasks: Int?
     var debugPayloads: Bool?
@@ -42,7 +42,7 @@ struct SwarmHiveRunOptionsOverride: Sendable, Equatable {
 
 /// Policy hints for model inference routing.
 ///
-/// When running on the Hive runtime, these map to `HiveInferenceHints`.
+/// When running on the graph runtime, these hints are forwarded to the internal routing engine.
 public struct InferencePolicy: Sendable, Equatable {
     /// Desired latency tier for inference.
     public enum LatencyTier: String, Sendable, Equatable {
@@ -232,18 +232,18 @@ public struct AgentConfiguration: Sendable, Equatable {
     /// regardless of `contextProfile`.
     public var contextMode: ContextMode
 
-    // MARK: - Hive Runtime Settings
+    // MARK: - Graph Runtime Settings
 
-    /// Internal Hive run options override for orchestration execution.
+    /// Internal graph runtime override for orchestration execution.
     ///
     /// This property is for internal framework use only. It allows fine-tuning
-    /// of Hive runtime behavior during orchestration runs, including step limits,
+    /// of graph runtime behavior during orchestration runs, including step limits,
     /// concurrency controls, and debug options.
     ///
     /// - Note: This is not part of the public API and may change without notice.
     /// - Important: Use standard configuration properties instead of this override
     ///   for stable, supported behavior.
-    var hiveRunOptionsOverride: SwarmHiveRunOptionsOverride?
+    var graphRunOptionsOverride: SwarmGraphRunOptionsOverride?
 
     /// Inference routing policy hints.
     ///
@@ -251,7 +251,7 @@ public struct AgentConfiguration: Sendable, Equatable {
     /// to specify latency requirements, privacy constraints, token budgets,
     /// and network state preferences.
     ///
-    /// When using the Hive runtime, these hints map directly to `HiveInferenceHints`.
+    /// When using the graph runtime, these hints feed the runtime's internal routing layer.
     ///
     /// ## Use Cases
     /// - **Privacy**: Force on-device inference for sensitive data
@@ -600,7 +600,7 @@ public struct AgentConfiguration: Sendable, Equatable {
         self.stopSequences = stopSequences
         self.modelSettings = modelSettings
         self.contextProfile = contextProfile
-        self.hiveRunOptionsOverride = nil
+        self.graphRunOptionsOverride = nil
         self.inferencePolicy = inferencePolicy
         self.enableStreaming = enableStreaming
         self.includeToolCallDetails = includeToolCallDetails
@@ -870,7 +870,7 @@ extension AgentConfiguration {
         return copy
     }
 
-    // MARK: Hive Runtime Settings
+    // MARK: Graph Runtime Settings
 
     /// Sets the inference routing policy hints.
     ///
@@ -1126,7 +1126,7 @@ extension AgentConfiguration: CustomStringConvertible {
             stopSequences: \(stopSequences),
             modelSettings: \(modelSettings.map { String(describing: $0) } ?? "nil"),
             contextProfile: \(contextProfile),
-            hiveRunOptionsOverride: \(hiveRunOptionsOverride.map { String(describing: $0) } ?? "nil"),
+            graphRunOptionsOverride: \(graphRunOptionsOverride.map { String(describing: $0) } ?? "nil"),
             inferencePolicy: \(inferencePolicy.map { String(describing: $0) } ?? "nil"),
             enableStreaming: \(enableStreaming),
             includeToolCallDetails: \(includeToolCallDetails),

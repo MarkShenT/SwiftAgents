@@ -128,8 +128,8 @@ enum ChatGraph {
     ///     guardrails, response filtering, or custom routing logic.
     /// - Returns: A compiled Hive graph ready for execution.
     static func makeToolUsingChatAgent(
-        preModel: HiveNode<Schema>? = nil,
-        postModel: HiveNode<Schema>? = nil,
+        preModel: NodeAction<Schema>? = nil,
+        postModel: NodeAction<Schema>? = nil,
         preModelHook: (any PreModelHook)? = nil,
         toolProvider: ToolProvider? = nil,
         messageIDFactory: (any MessageIDFactory)? = nil,
@@ -568,7 +568,7 @@ extension ChatGraph {
         }
     }
 
-    private static func builtInPreModel(_ preModelHook: any PreModelHook) -> HiveNode<Schema> {
+    private static func builtInPreModel(_ preModelHook: any PreModelHook) -> NodeAction<Schema> {
         { input in
             let messages = try input.store.get(Schema.messagesKey)
             // Ensure llmInputMessages channel is initialized before reading messages.
@@ -647,7 +647,7 @@ extension ChatGraph {
     private static func modelNode(
         toolProvider: ToolProvider?,
         messageIDFactory: any MessageIDFactory
-    ) -> HiveNode<Schema> {
+    ) -> NodeAction<Schema> {
         { input in
             let messages = try input.store.get(Schema.messagesKey)
             let llmInputMessages = try input.store.get(Schema.llmInputMessagesKey)
@@ -742,7 +742,7 @@ extension ChatGraph {
         }
     }
 
-    private static func toolsNode() -> HiveNode<Schema> {
+    private static func toolsNode() -> NodeAction<Schema> {
         { input in
             let pending = try input.store.get(Schema.pendingToolCallsKey)
             let calls = pending.sorted(by: HiveDeterministicSort.toolCalls)
@@ -815,7 +815,7 @@ extension ChatGraph {
         )
     }
 
-    private static func toolExecuteNode(transformer: any ToolResultTransformer) -> HiveNode<Schema> {
+    private static func toolExecuteNode(transformer: any ToolResultTransformer) -> NodeAction<Schema> {
         { input in
             let pending = try input.store.get(Schema.pendingToolCallsKey)
             let calls = pending.sorted(by: HiveDeterministicSort.toolCalls)

@@ -16,6 +16,13 @@ struct WorkflowDurableTests {
         }
     }
 
+    @Test("durable runtime unavailable uses Swarm-owned error naming")
+    func durableRuntimeUnavailableNameIsPublic() {
+        let error = WorkflowError.durableRuntimeUnavailable(reason: "missing engine")
+        #expect(error.localizedDescription.contains("durable runtime unavailable"))
+        #expect(error.debugDescription.contains("durableRuntimeUnavailable"))
+    }
+
     @Test("durable execute can resume from latest checkpoint")
     func resumeFromCheckpoint() async throws {
         let checkpointing = WorkflowCheckpointing.inMemory()

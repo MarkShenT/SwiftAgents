@@ -2,19 +2,19 @@ import Dispatch
 import Foundation
 import HiveCore
 
-struct WorkflowHiveContext: Sendable {
+struct WorkflowDurableContext: Sendable {
     let workflow: Workflow
     let signature: String
 }
 
-enum WorkflowHiveInput: Sendable {
+enum WorkflowDurableInput: Sendable {
     case start(input: String, signature: String)
     case resume
 }
 
-struct WorkflowHiveSchema: HiveSchema {
-    typealias Context = WorkflowHiveContext
-    typealias Input = WorkflowHiveInput
+struct WorkflowDurableSchema: HiveSchema {
+    typealias Context = WorkflowDurableContext
+    typealias Input = WorkflowDurableInput
     typealias InterruptPayload = String
     typealias ResumePayload = String
 
@@ -34,7 +34,7 @@ struct WorkflowHiveSchema: HiveSchema {
                     reducer: .lastWriteWins(),
                     updatePolicy: .single,
                     initial: { "" },
-                    codec: HiveAnyCodec(WorkflowHiveCodableJSONCodec<String>()),
+                    codec: HiveAnyCodec(WorkflowCheckpointCodec<String>()),
                     persistence: .checkpointed
                 )
             ),
@@ -45,7 +45,7 @@ struct WorkflowHiveSchema: HiveSchema {
                     reducer: .lastWriteWins(),
                     updatePolicy: .single,
                     initial: { Optional<WorkflowResultSnapshot>.none },
-                    codec: HiveAnyCodec(WorkflowHiveCodableJSONCodec<WorkflowResultSnapshot?>()),
+                    codec: HiveAnyCodec(WorkflowCheckpointCodec<WorkflowResultSnapshot?>()),
                     persistence: .checkpointed
                 )
             ),
@@ -56,7 +56,7 @@ struct WorkflowHiveSchema: HiveSchema {
                     reducer: .lastWriteWins(),
                     updatePolicy: .single,
                     initial: { 0 },
-                    codec: HiveAnyCodec(WorkflowHiveCodableJSONCodec<Int>()),
+                    codec: HiveAnyCodec(WorkflowCheckpointCodec<Int>()),
                     persistence: .checkpointed
                 )
             ),
@@ -67,7 +67,7 @@ struct WorkflowHiveSchema: HiveSchema {
                     reducer: .lastWriteWins(),
                     updatePolicy: .single,
                     initial: { 0 },
-                    codec: HiveAnyCodec(WorkflowHiveCodableJSONCodec<Int>()),
+                    codec: HiveAnyCodec(WorkflowCheckpointCodec<Int>()),
                     persistence: .checkpointed
                 )
             ),
@@ -78,7 +78,7 @@ struct WorkflowHiveSchema: HiveSchema {
                     reducer: .lastWriteWins(),
                     updatePolicy: .single,
                     initial: { false },
-                    codec: HiveAnyCodec(WorkflowHiveCodableJSONCodec<Bool>()),
+                    codec: HiveAnyCodec(WorkflowCheckpointCodec<Bool>()),
                     persistence: .checkpointed
                 )
             ),
@@ -89,7 +89,7 @@ struct WorkflowHiveSchema: HiveSchema {
                     reducer: .lastWriteWins(),
                     updatePolicy: .single,
                     initial: { "" },
-                    codec: HiveAnyCodec(WorkflowHiveCodableJSONCodec<String>()),
+                    codec: HiveAnyCodec(WorkflowCheckpointCodec<String>()),
                     persistence: .checkpointed
                 )
             ),
@@ -114,7 +114,7 @@ struct WorkflowHiveSchema: HiveSchema {
     }
 }
 
-struct WorkflowHiveEngine: Sendable {
+struct WorkflowDurableEngine: Sendable {
     let workflow: Workflow
     let checkpointing: WorkflowCheckpointing
     let checkpointID: String
@@ -123,27 +123,26 @@ struct WorkflowHiveEngine: Sendable {
 
     func run(startInput: String) async throws -> AgentResult {
         let graph = try makeGraph()
-        let context = WorkflowHiveContext(
+        let context = WorkflowDurableContext(
             workflow: workflow,
             signature: workflow.workflowSignature
         )
 
-        let environment = HiveEnvironment<WorkflowHiveSchema>(
+        let environment = HiveEnvironment<WorkflowDurableSchema>(
             context: context,
-            clock: WorkflowHiveClock(),
-            logger: WorkflowHiveLogger(),
+            clock: WorkflowDurableClock(),
+            logger: WorkflowDurableLogger(),
             model: nil,
             modelRouter: nil,
             tools: nil,
-            checkpointStore: checkpointing.store
+            checkpointStore: checkpointing.runtimeStore
         )
 
         let runtime = try HiveRuntime(graph: graph, environment: environment)
         let threadID = HiveThreadID(checkpointID)
 
         if resume {
-            let existing = try await checkpointing.store.loadLatest(threadID: threadID)
-            guard existing != nil else {
+            guard try await checkpointing.containsCheckpoint(for: checkpointID) else {
                 throw WorkflowError.checkpointNotFound(id: checkpointID)
             }
         }
@@ -169,11 +168,11 @@ struct WorkflowHiveEngine: Sendable {
         return result
     }
 
-    private func makeGraph() throws -> CompiledHiveGraph<WorkflowHiveSchema> {
-        var builder = HiveGraphBuilder<WorkflowHiveSchema>(start: [WorkflowNodeID.execute])
+    private func makeGraph() throws -> CompiledHiveGraph<WorkflowDurableSchema> {
+        var builder = HiveGraphBuilder<WorkflowDurableSchema>(start: [WorkflowNodeID.execute])
         builder.addNode(WorkflowNodeID.execute, workflowNode)
         builder.addRouter(from: WorkflowNodeID.execute) { store in
-            let completed = (try? store.get(WorkflowHiveSchema.completedKey)) ?? false
+            let completed = (try? store.get(WorkflowDurableSchema.completedKey)) ?? false
             return completed ? .end : .to([WorkflowNodeID.execute])
         }
         return try builder.compile()
@@ -208,7 +207,7 @@ struct WorkflowHiveEngine: Sendable {
         return baseSteps + 4
     }
 
-    private func extractResult(from outcome: HiveRunOutcome<WorkflowHiveSchema>) throws -> AgentResult {
+    private func extractResult(from outcome: HiveRunOutcome<WorkflowDurableSchema>) throws -> AgentResult {
         switch outcome {
         case .finished(let output, _):
             return try extractResult(from: output)
@@ -221,20 +220,20 @@ struct WorkflowHiveEngine: Sendable {
         }
     }
 
-    private func extractResult(from output: HiveRunOutput<WorkflowHiveSchema>) throws -> AgentResult {
+    private func extractResult(from output: HiveRunOutput<WorkflowDurableSchema>) throws -> AgentResult {
         switch output {
         case .fullStore(let store):
-            if let snapshot = try store.get(WorkflowHiveSchema.lastResultKey) {
+            if let snapshot = try store.get(WorkflowDurableSchema.lastResultKey) {
                 return snapshot.agentResult
             }
-            let currentInput = try store.get(WorkflowHiveSchema.currentInputKey)
+            let currentInput = try store.get(WorkflowDurableSchema.currentInputKey)
             return AgentResult(output: currentInput)
 
         case .channels(let values):
-            if let snapshot = values.first(where: { $0.id == WorkflowHiveSchema.lastResultKey.id })?.value as? WorkflowResultSnapshot {
+            if let snapshot = values.first(where: { $0.id == WorkflowDurableSchema.lastResultKey.id })?.value as? WorkflowResultSnapshot {
                 return snapshot.agentResult
             }
-            if let currentInput = values.first(where: { $0.id == WorkflowHiveSchema.currentInputKey.id })?.value as? String {
+            if let currentInput = values.first(where: { $0.id == WorkflowDurableSchema.currentInputKey.id })?.value as? String {
                 return AgentResult(output: currentInput)
             }
             return AgentResult(output: "")
@@ -246,30 +245,30 @@ private enum WorkflowNodeID {
     static let execute = HiveNodeID("workflow.execute")
 }
 
-private func workflowNode(_ input: HiveNodeInput<WorkflowHiveSchema>) async throws -> HiveNodeOutput<WorkflowHiveSchema> {
-    let checkpointSignature = try input.store.get(WorkflowHiveSchema.signatureKey)
+private func workflowNode(_ input: HiveNodeInput<WorkflowDurableSchema>) async throws -> HiveNodeOutput<WorkflowDurableSchema> {
+    let checkpointSignature = try input.store.get(WorkflowDurableSchema.signatureKey)
     if checkpointSignature != input.context.signature {
         throw WorkflowError.resumeDefinitionMismatch(
             reason: "Workflow signature mismatch between checkpoint and current definition"
         )
     }
 
-    let completed = try input.store.get(WorkflowHiveSchema.completedKey)
+    let completed = try input.store.get(WorkflowDurableSchema.completedKey)
     if completed {
         return HiveNodeOutput(next: .end)
     }
 
-    let currentInput = try input.store.get(WorkflowHiveSchema.currentInputKey)
-    let lastResultSnapshot = try input.store.get(WorkflowHiveSchema.lastResultKey)
-    var stepCursor = try input.store.get(WorkflowHiveSchema.stepCursorKey)
-    var iterationCursor = try input.store.get(WorkflowHiveSchema.iterationCursorKey)
+    let currentInput = try input.store.get(WorkflowDurableSchema.currentInputKey)
+    let lastResultSnapshot = try input.store.get(WorkflowDurableSchema.lastResultKey)
+    var stepCursor = try input.store.get(WorkflowDurableSchema.stepCursorKey)
+    var iterationCursor = try input.store.get(WorkflowDurableSchema.iterationCursorKey)
 
     if stepCursor >= input.context.workflow.steps.count {
         if let repeatCondition = input.context.workflow.repeatCondition {
             let lastResult = lastResultSnapshot?.agentResult ?? AgentResult(output: currentInput)
             if repeatCondition(lastResult) {
                 return HiveNodeOutput(
-                    writes: [AnyHiveWrite(WorkflowHiveSchema.completedKey, true)],
+                    writes: [AnyHiveWrite(WorkflowDurableSchema.completedKey, true)],
                     next: .end
                 )
             }
@@ -277,7 +276,7 @@ private func workflowNode(_ input: HiveNodeInput<WorkflowHiveSchema>) async thro
             let nextIteration = iterationCursor + 1
             if nextIteration >= input.context.workflow.maxRepeatIterations {
                 return HiveNodeOutput(
-                    writes: [AnyHiveWrite(WorkflowHiveSchema.completedKey, true)],
+                    writes: [AnyHiveWrite(WorkflowDurableSchema.completedKey, true)],
                     next: .end
                 )
             }
@@ -287,15 +286,15 @@ private func workflowNode(_ input: HiveNodeInput<WorkflowHiveSchema>) async thro
 
             return HiveNodeOutput(
                 writes: [
-                    AnyHiveWrite(WorkflowHiveSchema.stepCursorKey, stepCursor),
-                    AnyHiveWrite(WorkflowHiveSchema.iterationCursorKey, iterationCursor),
-                    AnyHiveWrite(WorkflowHiveSchema.currentInputKey, lastResult.output),
+                    AnyHiveWrite(WorkflowDurableSchema.stepCursorKey, stepCursor),
+                    AnyHiveWrite(WorkflowDurableSchema.iterationCursorKey, iterationCursor),
+                    AnyHiveWrite(WorkflowDurableSchema.currentInputKey, lastResult.output),
                 ]
             )
         }
 
         return HiveNodeOutput(
-            writes: [AnyHiveWrite(WorkflowHiveSchema.completedKey, true)],
+            writes: [AnyHiveWrite(WorkflowDurableSchema.completedKey, true)],
             next: .end
         )
     }
@@ -306,14 +305,14 @@ private func workflowNode(_ input: HiveNodeInput<WorkflowHiveSchema>) async thro
 
     return HiveNodeOutput(
         writes: [
-            AnyHiveWrite(WorkflowHiveSchema.lastResultKey, Optional(snapshot)),
-            AnyHiveWrite(WorkflowHiveSchema.currentInputKey, result.output),
-            AnyHiveWrite(WorkflowHiveSchema.stepCursorKey, stepCursor + 1),
+            AnyHiveWrite(WorkflowDurableSchema.lastResultKey, Optional(snapshot)),
+            AnyHiveWrite(WorkflowDurableSchema.currentInputKey, result.output),
+            AnyHiveWrite(WorkflowDurableSchema.stepCursorKey, stepCursor + 1),
         ]
     )
 }
 
-private struct WorkflowHiveClock: HiveClock {
+private struct WorkflowDurableClock: HiveClock {
     func nowNanoseconds() -> UInt64 {
         DispatchTime.now().uptimeNanoseconds
     }
@@ -323,7 +322,7 @@ private struct WorkflowHiveClock: HiveClock {
     }
 }
 
-private struct WorkflowHiveLogger: HiveLogger {
+private struct WorkflowDurableLogger: HiveLogger {
     func debug(_ message: String, metadata: [String: String]) {}
     func info(_ message: String, metadata: [String: String]) {}
     func error(_ message: String, metadata: [String: String]) {}

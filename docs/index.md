@@ -54,7 +54,7 @@ features:
 ## Install
 
 ```swift
-.package(url: "https://github.com/christopherkarani/Swarm.git", from: "0.3.4")
+.package(url: "https://github.com/christopherkarani/Swarm.git", from: "0.5.0")
 ```
 
 ## Quick Start

@@ -66,7 +66,7 @@ struct SwarmMCPServerServiceTests {
         )
 
         #expect(result.isError != true)
-        #expect(result.content == [.text(text: "hello", annotations: nil, _meta: nil)])
+        #expect(result.content == [.text("hello")])
 
         let invocations = await executor.invocationsSnapshot()
         #expect(invocations.count == 1)
@@ -233,7 +233,7 @@ struct SwarmMCPServerServiceTests {
                         arguments: ["value": .int(i)]
                     )
                     guard
-                        case let .text(text: text, annotations: _, _meta: _)? = result.content.first,
+                        case let .text(text)? = result.content.first,
                         let parsed = Int(text)
                     else {
                         throw SwarmMCPServerServiceTestError.unreachable("unexpected content")

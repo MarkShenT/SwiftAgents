@@ -41,8 +41,8 @@ public enum WorkflowError: Error, Sendable, Equatable {
     /// All agents in parallel execution failed.
     case allAgentsFailed(errors: [String])
 
-    /// Hive runtime was required but unavailable for this build/runtime.
-    case hiveRuntimeUnavailable(reason: String)
+    /// The durable workflow engine was required but unavailable for this build/runtime.
+    case durableRuntimeUnavailable(reason: String)
 
     // MARK: - Workflow Control Errors
 
@@ -93,8 +93,8 @@ extension WorkflowError: LocalizedError {
         case let .allAgentsFailed(errors):
             let errorList = errors.joined(separator: ", ")
             return "All parallel agents failed: [\(errorList)]"
-        case let .hiveRuntimeUnavailable(reason):
-            return "Hive runtime unavailable: \(reason)"
+        case let .durableRuntimeUnavailable(reason):
+            return "Workflow durable runtime unavailable: \(reason)"
         case let .workflowInterrupted(reason):
             return "Workflow interrupted: \(reason)"
         case let .invalidGraph(validationError):
@@ -136,8 +136,8 @@ extension WorkflowError: CustomDebugStringConvertible {
             return "WorkflowError.mergeStrategyFailed(reason: \(reason))"
         case let .allAgentsFailed(errors):
             return "WorkflowError.allAgentsFailed(errors: \(errors))"
-        case let .hiveRuntimeUnavailable(reason):
-            return "WorkflowError.hiveRuntimeUnavailable(reason: \(reason))"
+        case let .durableRuntimeUnavailable(reason):
+            return "WorkflowError.durableRuntimeUnavailable(reason: \(reason))"
         case let .workflowInterrupted(reason):
             return "WorkflowError.workflowInterrupted(reason: \(reason))"
         case let .invalidGraph(validationError):

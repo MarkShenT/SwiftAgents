@@ -1,5 +1,4 @@
 import Foundation
-import HiveCore
 
 public extension Workflow {
     /// Namespaced access to durable workflow APIs.
@@ -72,16 +71,13 @@ extension Workflow {
         }
 
         let resolvedCheckpointID = checkpointID ?? checkpoint.id
-        let threadID = HiveThreadID(resolvedCheckpointID)
-
         if checkpointID != nil {
-            let latest = try await checkpointing.store.loadLatest(threadID: threadID)
-            guard latest != nil else {
+            guard try await checkpointing.containsCheckpoint(for: resolvedCheckpointID) else {
                 throw WorkflowError.checkpointNotFound(id: resolvedCheckpointID)
             }
         }
 
-        let engine = WorkflowHiveEngine(
+        let engine = WorkflowDurableEngine(
             workflow: self,
             checkpointing: checkpointing,
             checkpointID: resolvedCheckpointID,

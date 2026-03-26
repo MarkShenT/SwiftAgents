@@ -10,7 +10,7 @@ Add Swarm to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/christopherkarani/Swarm.git", from: "0.4.0")
+    .package(url: "https://github.com/christopherkarani/Swarm.git", from: "0.5.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: ["Swarm"])
