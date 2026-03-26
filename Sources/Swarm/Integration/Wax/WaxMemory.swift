@@ -168,3 +168,27 @@ public actor WaxMemory: Memory, MemoryPromptDescriptor, MemorySessionLifecycle {
         return lines.joined(separator: "\n")
     }
 }
+
+public extension WaxMemory {
+    /// Default persistent store location used when Swarm creates a durable Wax-backed memory automatically.
+    static let defaultStoreURL: URL = {
+        let fileManager = FileManager.default
+        let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let baseURL = isRunningTests
+            ? fileManager.temporaryDirectory
+            : (fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first ?? fileManager.temporaryDirectory)
+
+        let root = baseURL
+            .appendingPathComponent("Swarm", isDirectory: true)
+            .appendingPathComponent(
+                isRunningTests ? "AgentMemoryTests" : "AgentMemory",
+                isDirectory: true
+            )
+
+        try? fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        return root.appendingPathComponent("wax-memory.mv2s")
+    }()
+}
