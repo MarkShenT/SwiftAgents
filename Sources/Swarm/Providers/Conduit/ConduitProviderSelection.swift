@@ -3,6 +3,7 @@
 //
 // Minimal Conduit-backed provider selection for Swarm.
 
+import Conduit
 import ConduitAdvanced
 import Foundation
 
@@ -155,6 +156,18 @@ public enum ConduitProviderSelection: Sendable, InferenceProvider {
             return openRouter(apiKey: apiKey, model: routedModel)
         #endif
     }
+
+#if CONDUIT_TRAIT_MLX && canImport(MLX)
+    /// Creates an MLX-backed provider for a Hugging Face model identifier.
+    public static func mlx(model: String) -> ConduitProviderSelection {
+        .provider(makeMLXInferenceProvider(model: .mlx(model)))
+    }
+
+    /// Creates an MLX-backed provider for a local filesystem model directory.
+    public static func mlxLocal(path: String) -> ConduitProviderSelection {
+        .provider(makeMLXInferenceProvider(model: .mlxLocal(path)))
+    }
+#endif
 
     /// Exposes the underlying inference provider.
     public func makeProvider() -> any InferenceProvider {

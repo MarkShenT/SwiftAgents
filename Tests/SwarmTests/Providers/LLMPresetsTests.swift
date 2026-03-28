@@ -131,6 +131,30 @@ struct LLMPresetsTests {
         #expect(configuration.numCtx == 4096)
         #expect(configuration.healthCheck == false)
     }
+
+#if CONDUIT_TRAIT_MLX && canImport(MLX)
+    @Test("MLX preset builds a text-only conversation adapter")
+    func mlxPresetBuildsTextOnlyConversationAdapter() throws {
+        let preset = LLM.mlx("mlx-community/Llama-3.2-1B-Instruct-4bit")
+        let provider = preset._makeProviderForTesting()
+
+        #expect(provider is TextOnlyConversationInferenceProviderAdapter)
+
+        let capabilities = InferenceProviderCapabilities.resolved(for: provider)
+        #expect(capabilities.contains(.conversationMessages))
+        #expect(!capabilities.contains(.nativeToolCalling))
+    }
+
+    @Test("MLX local preset builds a text-only conversation adapter")
+    func mlxLocalPresetBuildsTextOnlyConversationAdapter() throws {
+        let preset = LLM.mlxLocal("/Users/me/models/Qwen3-8B-MLX-bf16")
+        let provider = preset._makeProviderForTesting()
+
+        #expect(provider is TextOnlyConversationInferenceProviderAdapter)
+        let capabilities = InferenceProviderCapabilities.resolved(for: provider)
+        #expect(capabilities.contains(.conversationMessages))
+    }
+#endif
 }
 
 private func mirroredOpenRouterMetadata(from provider: Any) -> (siteURL: URL?, appName: String?, dataCollectionDescription: String?)? {

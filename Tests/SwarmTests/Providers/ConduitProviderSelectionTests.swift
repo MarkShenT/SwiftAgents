@@ -157,6 +157,30 @@ struct ConduitProviderSelectionTests {
         #expect(config.numCtx == 4096)
         #expect(config.healthCheck == false)
     }
+
+#if CONDUIT_TRAIT_MLX && canImport(MLX)
+    @Test("Builds MLX text-only provider")
+    func buildsMLXProvider() {
+        let provider = ConduitProviderSelection
+            .mlx(model: "mlx-community/Llama-3.2-1B-Instruct-4bit")
+            .makeProvider()
+
+        #expect(provider is TextOnlyConversationInferenceProviderAdapter)
+        let capabilities = InferenceProviderCapabilities.resolved(for: provider)
+        #expect(capabilities.contains(.conversationMessages))
+    }
+
+    @Test("Builds MLX local text-only provider")
+    func buildsMLXLocalProvider() {
+        let provider = ConduitProviderSelection
+            .mlxLocal(path: "/Users/me/models/Qwen3-8B-MLX-bf16")
+            .makeProvider()
+
+        #expect(provider is TextOnlyConversationInferenceProviderAdapter)
+        let capabilities = InferenceProviderCapabilities.resolved(for: provider)
+        #expect(capabilities.contains(.conversationMessages))
+    }
+#endif
 }
 
 private func mirroredOpenRouterMetadata(from provider: Any) -> (siteURL: URL?, appName: String?, dataCollectionDescription: String?)? {

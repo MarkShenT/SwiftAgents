@@ -33,6 +33,14 @@ struct ProviderFactoryTests {
         let _: any InferenceProvider = provider
     }
 
+#if CONDUIT_TRAIT_MLX && canImport(MLX)
+    @Test("mlx factory creates provider")
+    func mlxFactory() {
+        let provider = ConduitProviderSelection.mlx(model: "mlx-community/Llama-3.2-1B-Instruct-4bit")
+        let _: any InferenceProvider = provider
+    }
+#endif
+
     @Test("dot-syntax works in function parameter context")
     func dotSyntaxInFunctionContext() {
         func takesProvider(_ p: some InferenceProvider) {}

@@ -2,23 +2,7 @@
 import PackageDescription
 import CompilerPluginSupport
 import Foundation
-
-let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let includeDemo = ProcessInfo.processInfo.environment["SWARM_INCLUDE_DEMO"] == "1"
-let useLocalDeps = ProcessInfo.processInfo.environment["AISTACK_USE_LOCAL_DEPS"] == "1"
-
-func localDependencyPath(_ name: String) -> String {
-    let candidateRoots = [
-        packageRoot.appendingPathComponent("../\(name)").standardizedFileURL.path,
-        packageRoot.appendingPathComponent("../../\(name)").standardizedFileURL.path,
-    ]
-
-    for path in candidateRoots where FileManager.default.fileExists(atPath: path) {
-        return path
-    }
-
-    return candidateRoots[0]
-}
 
 var packageProducts: [Product] = [
     .library(name: "Swarm", targets: ["Swarm"]),
@@ -36,41 +20,22 @@ var packageDependencies: [Package.Dependency] = [
     .package(url: "https://github.com/apple/swift-log.git", from: "1.10.1"),
     .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.11.0"),
     .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.13.2"),
+    // Production graph must resolve to the published tag set that is known to build together.
+    .package(url: "https://github.com/christopherkarani/Wax.git", exact: "0.1.19"),
+    .package(
+        url: "https://github.com/christopherkarani/Conduit",
+        exact: "0.3.10",
+        traits: [
+            .trait(name: "OpenAI"),
+            .trait(name: "OpenRouter"),
+            .trait(name: "Anthropic"),
+            .trait(name: "MLX"),
+        ]
+    ),
+    .package(url: "https://github.com/christopherkarani/ContextCore.git", exact: "1.0.0"),
+    .package(url: "https://github.com/christopherkarani/Membrane", exact: "0.1.3"),
+    .package(url: "https://github.com/christopherkarani/Hive", exact: "0.1.9"),
 ]
-
-if useLocalDeps {
-    packageDependencies += [
-        .package(path: localDependencyPath("Wax")),
-        .package(
-            path: localDependencyPath("Conduit"),
-            traits: [
-                .trait(name: "OpenAI"),
-                .trait(name: "OpenRouter"),
-                .trait(name: "Anthropic"),
-            ]
-        ),
-        .package(path: localDependencyPath("ContextCore")),
-        .package(path: localDependencyPath("Membrane")),
-        .package(path: localDependencyPath("Hive")),
-    ]
-} else {
-    packageDependencies += [
-        // Production graph must resolve to the published tag set that is known to build together.
-        .package(url: "https://github.com/christopherkarani/Wax.git", exact: "0.1.19"),
-        .package(
-            url: "https://github.com/christopherkarani/Conduit",
-            exact: "0.3.10",
-            traits: [
-                .trait(name: "OpenAI"),
-                .trait(name: "OpenRouter"),
-                .trait(name: "Anthropic"),
-            ]
-        ),
-        .package(url: "https://github.com/christopherkarani/ContextCore.git", exact: "1.0.0"),
-        .package(url: "https://github.com/christopherkarani/Membrane", exact: "0.1.3"),
-        .package(url: "https://github.com/christopherkarani/Hive", exact: "0.1.9"),
-    ]
-}
 
 var swarmDependencies: [Target.Dependency] = [
     "SwarmMacros",
