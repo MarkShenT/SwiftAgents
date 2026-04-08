@@ -18,11 +18,13 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
     init(
         provider: Provider,
         model: Provider.ModelID,
-        baseConfig: GenerateConfig = .default
+        baseConfig: GenerateConfig = .default,
+        supportsStreamingToolCalls: Bool = true
     ) {
         self.provider = provider
         self.model = model
         self.baseConfig = baseConfig
+        self.supportsStreamingToolCalls = supportsStreamingToolCalls
     }
 
     func generate(prompt: String, options: InferenceOptions) async throws -> String {
@@ -31,12 +33,15 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
     }
 
     var capabilities: InferenceProviderCapabilities {
-        [
+        var capabilities: InferenceProviderCapabilities = [
             .conversationMessages,
             .nativeToolCalling,
-            .streamingToolCalls,
             .structuredOutputs,
         ]
+        if supportsStreamingToolCalls {
+            capabilities.insert(.streamingToolCalls)
+        }
+        return capabilities
     }
 
     func stream(prompt: String, options: InferenceOptions) -> AsyncThrowingStream<String, Error> {
@@ -181,7 +186,14 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
         tools: [ToolSchema],
         options: InferenceOptions
     ) -> AsyncThrowingStream<InferenceStreamUpdate, Error> {
-        StreamHelper.makeTrackedStream { continuation in
+        guard supportsStreamingToolCalls else {
+            return StreamHelper.makeTrackedStream { continuation in
+                continuation.finish(
+                    throwing: AgentError.generationFailed(reason: "Provider does not support streaming tool calls")
+                )
+            }
+        }
+        return StreamHelper.makeTrackedStream { continuation in
             var config = try apply(options: options, to: baseConfig)
             let toolDefinitions = try ConduitToolSchemaConverter.toolDefinitions(from: tools)
             config = config.tools(toolDefinitions)
@@ -210,14 +222,14 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
 
             for try await chunk in chunkStream {
                 if !chunk.text.isEmpty {
-                    continuation.yield(.outputChunk(chunk.text))
+                    continuation.yield(InferenceStreamUpdate.outputChunk(chunk.text))
                 }
 
                 if let partial = chunk.partialToolCall {
                     // Avoid emitting duplicate fragments if the provider repeats the same buffer.
                     if lastFragmentByCallId[partial.id] != partial.argumentsFragment {
                         lastFragmentByCallId[partial.id] = partial.argumentsFragment
-                        continuation.yield(.toolCallPartial(
+                        continuation.yield(InferenceStreamUpdate.toolCallPartial(
                             PartialToolCallUpdate(
                                 providerCallId: partial.id,
                                 toolName: partial.toolName,
@@ -229,7 +241,7 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
                 }
 
                 if let usage = chunk.usage {
-                    continuation.yield(.usage(
+                    continuation.yield(InferenceStreamUpdate.usage(
                         TokenUsage(
                             inputTokens: usage.promptTokens,
                             outputTokens: usage.completionTokens
@@ -239,7 +251,7 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
 
                 if let completed = chunk.completedToolCalls, !completed.isEmpty {
                     let parsedToolCalls = try ConduitToolCallConverter.toParsedToolCalls(completed)
-                    continuation.yield(.toolCallsCompleted(parsedToolCalls))
+                    continuation.yield(InferenceStreamUpdate.toolCallsCompleted(parsedToolCalls))
                 }
             }
 
@@ -251,7 +263,7 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
         messages: [InferenceMessage],
         options: InferenceOptions
     ) -> AsyncThrowingStream<String, Error> {
-        StreamHelper.makeTrackedStream { continuation in
+        return StreamHelper.makeTrackedStream { continuation in
             let config = try apply(options: options, to: baseConfig)
             let conduitMessages = try Self.conduitMessages(from: messages)
             let stream = provider.streamWithMetadata(messages: conduitMessages, model: model, config: config)
@@ -271,7 +283,14 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
         tools: [ToolSchema],
         options: InferenceOptions
     ) -> AsyncThrowingStream<InferenceStreamUpdate, Error> {
-        StreamHelper.makeTrackedStream { continuation in
+        guard supportsStreamingToolCalls else {
+            return StreamHelper.makeTrackedStream { continuation in
+                continuation.finish(
+                    throwing: AgentError.generationFailed(reason: "Provider does not support streaming tool calls")
+                )
+            }
+        }
+        return StreamHelper.makeTrackedStream { continuation in
             var config = try apply(options: options, to: baseConfig)
             let toolDefinitions = try ConduitToolSchemaConverter.toolDefinitions(from: tools)
             config = config.tools(toolDefinitions)
@@ -300,13 +319,13 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
 
             for try await chunk in chunkStream {
                 if !chunk.text.isEmpty {
-                    continuation.yield(.outputChunk(chunk.text))
+                    continuation.yield(InferenceStreamUpdate.outputChunk(chunk.text))
                 }
 
                 if let partial = chunk.partialToolCall {
                     if lastFragmentByCallId[partial.id] != partial.argumentsFragment {
                         lastFragmentByCallId[partial.id] = partial.argumentsFragment
-                        continuation.yield(.toolCallPartial(
+                        continuation.yield(InferenceStreamUpdate.toolCallPartial(
                             PartialToolCallUpdate(
                                 providerCallId: partial.id,
                                 toolName: partial.toolName,
@@ -318,7 +337,7 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
                 }
 
                 if let usage = chunk.usage {
-                    continuation.yield(.usage(
+                    continuation.yield(InferenceStreamUpdate.usage(
                         TokenUsage(
                             inputTokens: usage.promptTokens,
                             outputTokens: usage.completionTokens
@@ -328,7 +347,7 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
 
                 if let completed = chunk.completedToolCalls, !completed.isEmpty {
                     let parsedToolCalls = try ConduitToolCallConverter.toParsedToolCalls(completed)
-                    continuation.yield(.toolCallsCompleted(parsedToolCalls))
+                    continuation.yield(InferenceStreamUpdate.toolCallsCompleted(parsedToolCalls))
                 }
             }
 
@@ -341,6 +360,7 @@ struct ConduitInferenceProvider<Provider: TextGenerator>: InferenceProvider,
     private let provider: Provider
     private let model: Provider.ModelID
     private let baseConfig: GenerateConfig
+    private let supportsStreamingToolCalls: Bool
 
     private static func conduitMessages(from messages: [InferenceMessage]) throws -> [Message] {
         let toolNamesByCallID = Dictionary(

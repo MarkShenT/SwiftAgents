@@ -7,6 +7,10 @@ import Conduit
 import ConduitAdvanced
 import Foundation
 
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
+
 /// Convenience selection for Conduit-backed inference providers.
 ///
 /// This hides Conduit types while keeping a lightweight call-site API.
@@ -34,6 +38,19 @@ public enum ConduitProviderSelection: Sendable, InferenceProvider {
         let provider = OpenAIProvider(apiKey: apiKey)
         let modelID = openAIModelID(model)
         let bridge = ConduitInferenceProvider(provider: provider, model: modelID)
+        return .provider(bridge)
+    }
+
+    /// Creates a Conduit-backed Apple Foundation Models provider.
+    public static func foundationModels(
+        configuration: FMConfiguration = .default
+    ) -> ConduitProviderSelection {
+        let provider = FoundationModelsProvider(configuration: configuration)
+        let bridge = ConduitInferenceProvider(
+            provider: provider,
+            model: .foundationModels,
+            supportsStreamingToolCalls: false
+        )
         return .provider(bridge)
     }
 
@@ -328,6 +345,12 @@ public extension InferenceProvider where Self == ConduitProviderSelection {
 
     static func openAI(apiKey: String, model: String = "gpt-4o") -> ConduitProviderSelection {
         ConduitProviderSelection.openAI(apiKey: apiKey, model: model)
+    }
+
+    static func foundationModels(
+        configuration: FMConfiguration = .default
+    ) -> ConduitProviderSelection {
+        ConduitProviderSelection.foundationModels(configuration: configuration)
     }
 
     static func openRouter(

@@ -51,9 +51,14 @@ public extension InferenceProviderCapabilities {
 
     /// Effective provider capabilities after merging explicit reporting with protocol inference.
     static func resolved(for provider: any InferenceProvider) -> Self {
-        var capabilities = inferred(from: provider)
+        var capabilities: Self
         if let reportingProvider = provider as? any CapabilityReportingInferenceProvider {
-            capabilities.formUnion(reportingProvider.capabilities)
+            capabilities = reportingProvider.capabilities
+        } else {
+            capabilities = inferred(from: provider)
+        }
+        if provider is any ConversationInferenceProvider {
+            capabilities.insert(.conversationMessages)
         }
         return capabilities
     }

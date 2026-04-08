@@ -4,6 +4,9 @@ import ConduitAdvanced
 import Conduit
 #endif
 import Foundation
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 import Testing
 @testable import Swarm
 
@@ -25,6 +28,23 @@ struct ConduitProviderSelectionTests {
             .makeProvider()
 
         #expect(provider is ConduitInferenceProvider<OpenAIProvider>)
+    }
+
+    @Test("Builds Foundation Models Conduit provider with non-streaming tool-call capabilities")
+    func buildsFoundationModelsProvider() {
+        guard #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *) else {
+            return
+        }
+
+        let provider = ConduitProviderSelection
+            .foundationModels()
+            .makeProvider()
+
+        #expect(provider is ConduitInferenceProvider<FoundationModelsProvider>)
+        let capabilities = InferenceProviderCapabilities.resolved(for: provider)
+        #expect(capabilities.contains(.nativeToolCalling))
+        #expect(capabilities.contains(.structuredOutputs))
+        #expect(capabilities.contains(.streamingToolCalls) == false)
     }
 
     @Test("Builds MiniMax Conduit provider")

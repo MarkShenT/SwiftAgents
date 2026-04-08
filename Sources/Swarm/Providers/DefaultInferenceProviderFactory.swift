@@ -20,35 +20,10 @@ enum DefaultInferenceProviderFactory {
             guard model.availability == .available else {
                 return nil
             }
-            return FoundationModelsInferenceProvider()
+            return ConduitProviderSelection.foundationModels()
         }
         #endif
 
         return nil
     }
 }
-
-#if canImport(FoundationModels)
-@available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
-private struct FoundationModelsInferenceProvider: InferenceProvider {
-    func generate(prompt: String, options: InferenceOptions) async throws -> String {
-        let session = LanguageModelSession()
-        return try await session.generate(prompt: prompt, options: options)
-    }
-
-    func stream(prompt: String, options: InferenceOptions) -> AsyncThrowingStream<String, Error> {
-        let session = LanguageModelSession()
-        return session.stream(prompt: prompt, options: options)
-    }
-
-    func generateWithToolCalls(
-        prompt: String,
-        tools: [ToolSchema],
-        options: InferenceOptions
-    ) async throws -> InferenceResponse {
-        let session = LanguageModelSession()
-        return try await session.generateWithToolCalls(prompt: prompt, tools: tools, options: options)
-    }
-}
-#endif
-
