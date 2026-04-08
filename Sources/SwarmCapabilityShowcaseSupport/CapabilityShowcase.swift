@@ -615,8 +615,8 @@ private func runWorkspaceScenario(context: CapabilityScenarioContext) async thro
     let specAgent = try Agent.spec("support", in: workspace, inferenceProvider: specProvider)
     _ = try await specAgent.run("I need a refund")
 
-    let onDevicePrompt = await onDeviceProvider.lastGeneratePrompt() ?? ""
-    let specPrompt = await specProvider.lastGeneratePrompt() ?? ""
+    let onDevicePrompt = await onDeviceProvider.lastPrompt() ?? ""
+    let specPrompt = await specProvider.lastPrompt() ?? ""
     try ensure(onDevicePrompt.contains("Global workspace rule."), "Expected AGENTS.md content in on-device prompt.")
     try ensure(specPrompt.contains("You are the support agent."), "Expected agent spec body in spec prompt.")
     try ensure(specPrompt.contains("refund window"), "Expected skill body to be retrieved into the spec prompt.")
@@ -1030,8 +1030,14 @@ private actor ScriptedInferenceProvider: InferenceProvider {
         generateCalls.map(\.prompt)
     }
 
-    func lastGeneratePrompt() -> String? {
-        generateCalls.last?.prompt
+    func lastPrompt() -> String? {
+        if let prompt = toolCallCalls.last?.prompt {
+            return prompt
+        }
+        if let prompt = generateCalls.last?.prompt {
+            return prompt
+        }
+        return streamCalls.last?.prompt
     }
 
     private func generateForStream(prompt: String, options: InferenceOptions) async throws -> String {

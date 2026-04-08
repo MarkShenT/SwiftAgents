@@ -233,7 +233,7 @@ struct SwarmMCPServerServiceTests {
                         arguments: ["value": .int(i)]
                     )
                     guard
-                        case let .text(text, _, _)? = result.content.first,
+                        case let .text(text: text, annotations: _, _meta: _)? = result.content.first,
                         let parsed = Int(text)
                     else {
                         throw SwarmMCPServerServiceTestError.unreachable("unexpected content")

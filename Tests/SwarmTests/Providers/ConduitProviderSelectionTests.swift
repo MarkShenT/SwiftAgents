@@ -4,6 +4,9 @@ import ConduitAdvanced
 import Conduit
 #endif
 import Foundation
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 import Testing
 @testable import Swarm
 
